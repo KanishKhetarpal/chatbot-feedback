@@ -54,8 +54,8 @@ export class ChatAgentsController {
     summary: 'Chatbots any signed-in account may talk to',
     description: 'Active chatbots only, presentation fields only — what the gallery draws for a tester.',
   })
-  async available() {
-    return { agents: await this.chatAgents.listAvailable() };
+  async available(@CurrentUser('userId') userId: string) {
+    return { agents: await this.chatAgents.listAvailable(userId) };
   }
 
   @Get()

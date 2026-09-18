@@ -101,6 +101,7 @@ const HISTORY_SELECT = {
   chipNodeId: true,
   rating: true,
   feedbackNote: true,
+  feedbackReason: true,
   createdAt: true,
 } as const;
 
@@ -455,9 +456,11 @@ export class WidgetService {
       data: {
         rating,
         feedbackNote: dto.note?.trim() || null,
+        // A reason only means something next to a vote. Omitted = keep what is stored.
+        ...(rating ? (dto.reason !== undefined ? { feedbackReason: dto.reason } : {}) : { feedbackReason: null }),
         ratedAt: rating || dto.note?.trim() ? new Date() : null,
       },
-      select: { id: true, rating: true, feedbackNote: true, ratedAt: true },
+      select: { id: true, rating: true, feedbackNote: true, feedbackReason: true, ratedAt: true },
     });
     return { ok: true, message: updated };
   }

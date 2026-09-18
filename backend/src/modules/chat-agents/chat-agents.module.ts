@@ -4,6 +4,7 @@ import { PrismaModule } from '../../prisma/prisma.module';
 import { AiModule } from '../ai/ai.module';
 import { ChatAgentsController } from './chat-agents.controller';
 import { ChatAgentsService } from './chat-agents.service';
+import { FeedbackPatternsService } from './feedback-patterns.service';
 import { GuidedFlowRuntimeService } from './guided-flow-runtime.service';
 import { InboxController } from './inbox.controller';
 import { InboxService } from './inbox.service';
@@ -29,6 +30,7 @@ import { WidgetService } from './widget.service';
     KnowledgeService,
     KnowledgeFileStorageService,
     InboxService,
+    FeedbackPatternsService,
     GuidedFlowRuntimeService,
     TrainingService,
     WidgetService,

@@ -1,29 +1,30 @@
-import { useEffect } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { MessageSquare } from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import { MessagesSquare } from "lucide-react";
 
 import { useGetAvailableChatAgents } from "@/components/chat-agents/hook/query/use-get-available-chat-agents";
 
-/** `/chat` with nothing picked: open the first live chatbot, or explain why there is none. */
+/** `/chat` with nothing picked: the empty right-hand pane (on a phone the list is what shows). */
 export const Route = createFileRoute("/chat/")({
   component: ChatIndex,
 });
 
 function ChatIndex() {
   const { data: agents, isLoading } = useGetAvailableChatAgents();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const first = agents?.[0];
-    if (first) void navigate({ to: "/chat/$publicKey", params: { publicKey: first.publicKey }, replace: true });
-  }, [agents, navigate]);
-
+  const none = !isLoading && (agents?.length ?? 0) === 0;
   return (
-    <div className="grid h-full w-full place-items-center text-center">
+    <div className="grid h-full w-full place-items-center p-6 text-center">
       <div className="max-w-xs">
-        <MessageSquare className="mx-auto size-8 text-muted-foreground" />
-        <p className="mt-3 text-sm font-medium">{isLoading ? "Loading chatbots…" : "Pick a chatbot on the left"}</p>
-        <p className="mt-1 text-xs text-muted-foreground">Each chatbot keeps its own conversation. Rate replies as you go.</p>
+        <div className="mx-auto grid size-16 place-items-center rounded-full bg-card shadow-elev-1">
+          <MessagesSquare className="size-7 text-muted-foreground" />
+        </div>
+        <p className="mt-4 text-base font-medium">
+          {isLoading ? "Loading chatbots…" : none ? "No chatbots are live yet" : "Select a chat to start messaging"}
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {none
+            ? "An admin needs to activate one from the Chatbots page."
+            : "Each chatbot keeps its own conversation. Use the ⋯ under any reply to like it, dislike it or leave a note."}
+        </p>
       </div>
     </div>
   );

@@ -73,13 +73,13 @@ function threadName(item: Pick<InboxThread, "user" | "name" | "visitorId">) {
  * Every recorded conversation, with the feedback left on it, plus an admin's
  * own review verdict. Three panes: list · transcript · details.
  */
-export function InboxView() {
+export function InboxView({ initialVisitorId }: { initialVisitorId?: string } = {}) {
   const { data: agents = [] } = useGetChatAgents();
   const [agentId, setAgentId] = useState("all");
   const [reviewStatus, setReviewStatus] = useState<"all" | InboxReviewStatus>("all");
   const [withFeedbackOnly, setWithFeedbackOnly] = useState(false);
   const [withMessagesOnly, setWithMessagesOnly] = useState(true);
-  const [visitorId, setVisitorId] = useState("");
+  const [visitorId, setVisitorId] = useState(initialVisitorId ?? "");
   const [showStats, setShowStats] = useState(true);
 
   const filters = {

@@ -11,4 +11,6 @@ export const QUERY_KEYS = {
   GET_WIDGET_INBOX_THREADS: "get-widget-inbox-threads",
   GET_WIDGET_INBOX_THREAD: "get-widget-inbox-thread",
   GET_WIDGET_INBOX_STATS: "get-widget-inbox-stats",
+  GET_FEEDBACK_PATTERNS: "get-feedback-patterns",
+  GET_AI_USAGE: "get-ai-usage",
 } as const;

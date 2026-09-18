@@ -391,6 +391,8 @@ export async function rateWidgetMessage(input: {
   messageId: string;
   rating: "up" | "down" | null;
   note?: string | null;
+  /** Why (one of FEEDBACK_REASONS). Omit to keep the stored reason; null clears it. */
+  reason?: string | null;
 }): Promise<void> {
   assertConfigured();
   const res = await fetch(`${BASE}/widget/feedback/message`, {
@@ -401,6 +403,7 @@ export async function rateWidgetMessage(input: {
       messageId: input.messageId,
       rating: input.rating,
       ...(input.note !== undefined ? { note: input.note } : {}),
+      ...(input.reason !== undefined ? { reason: input.reason } : {}),
     }),
   });
   if (!res.ok) throw await parseError(res);

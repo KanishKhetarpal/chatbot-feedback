@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import Anthropic from '@anthropic-ai/sdk';
+import { AiUsageRecorder } from './ai-usage.recorder';
 import type { AiAttribution, AiTokenUsage } from './ai-usage.types';
 
 /**
@@ -22,7 +23,7 @@ export class AnthropicService {
   private readonly logger = new Logger(AnthropicService.name);
   private readonly client: Anthropic;
 
-  constructor() {
+  constructor(private readonly usage: AiUsageRecorder) {
     this.client = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY,
       timeout: REQUEST_TIMEOUT_MS,
@@ -43,6 +44,12 @@ export class AnthropicService {
       }),
     );
     this.logger.debug(`countTokens [${attribution.endpoint}] model=${model} → ${result.input_tokens}`);
+    this.usage.record({
+      attribution,
+      model,
+      usage: { inputTokens: result.input_tokens, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      billable: false,
+    });
     return result.input_tokens;
   }
 
@@ -73,6 +80,7 @@ export class AnthropicService {
         }),
       );
       const usage = this.usageOf(message);
+      this.usage.record({ attribution, model: params.model, usage, latencyMs: Date.now() - start });
       this.logger.debug(
         `chat [${attribution.endpoint}] model=${params.model} ${Date.now() - start}ms in=${usage.inputTokens} out=${usage.outputTokens} cacheRead=${usage.cacheReadTokens}`,
       );
@@ -97,6 +105,7 @@ export class AnthropicService {
     attribution: AiAttribution & { endpoint: string },
     effort?: EffortLevel,
   ): Promise<void> {
+    const started = Date.now();
     const message = await this.client.messages.create({
       model,
       max_tokens: 0,
@@ -105,6 +114,7 @@ export class AnthropicService {
       messages: [{ role: 'user', content: 'warmup' }],
     });
     const usage = this.usageOf(message);
+    this.usage.record({ attribution, model, usage, latencyMs: Date.now() - started });
     this.logger.log(
       `warmCache [${attribution.endpoint}] model=${model} cacheWrite=${usage.cacheWriteTokens} cacheRead=${usage.cacheReadTokens}`,
     );

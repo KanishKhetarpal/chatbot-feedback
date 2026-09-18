@@ -284,6 +284,8 @@ model ChatWidgetMessage {
   rating       String?
   feedbackNote String?   @db.Text
   ratedAt      DateTime?
+  /// Why they liked / disliked it - one of FEEDBACK_REASONS (widget-feedback.dto.ts).
+  feedbackReason String?
 
   createdAt DateTime @default(now())
 
@@ -310,4 +312,36 @@ model ChatWidgetRateLimit {
   @@unique([scope, key])
   @@index([blockedUntil])
   @@map("chat_widget_rate_limits")
+}
+
+/// One row per Claude call, written by AnthropicService through AiUsageRecorder.
+/// No foreign keys on purpose: it is an append-only ledger and a deleted chatbot
+/// or conversation must not erase what it cost. Prices are NOT stored - they
+/// change; tokens are the durable fact and cost is computed at read time.
+model AiUsageLog {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  /// chat_widget | chat_agent_training
+  feature   String
+  /// widget.chat | widget.test | agent.warm-cache | agent.count-tokens
+  operation String
+  model     String
+
+  agentId   String?
+  visitorId String?
+  userId    String?
+
+  inputTokens      Int @default(0)
+  outputTokens     Int @default(0)
+  cacheReadTokens  Int @default(0)
+  cacheWriteTokens Int @default(0)
+  latencyMs        Int?
+  /// false for token counts, which Anthropic does not charge for.
+  billable Boolean @default(true)
+
+  @@index([createdAt])
+  @@index([agentId, createdAt])
+  @@index([model])
+  @@map("ai_usage_logs")
 }

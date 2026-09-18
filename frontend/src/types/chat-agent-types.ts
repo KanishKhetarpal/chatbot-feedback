@@ -474,6 +474,7 @@ export type InboxMessage = {
   chipNodeId?: string | null;
   rating: "up" | "down" | null;
   feedbackNote: string | null;
+  feedbackReason: string | null;
   ratedAt: string | null;
 };
 
@@ -680,6 +681,7 @@ export type WidgetServerMessage = {
   chipNodeId: string | null;
   rating: "up" | "down" | null;
   feedbackNote: string | null;
+  feedbackReason: string | null;
   createdAt: string;
 };
 
@@ -745,6 +747,7 @@ export type WidgetStoredMessage = {
   serverId?: string | null;
   rating?: "up" | "down" | null;
   feedbackNote?: string | null;
+  feedbackReason?: string | null;
 };
 
 /**
@@ -759,3 +762,93 @@ export type WidgetStreamEvent =
   | { event: "delta"; data: { text: string } }
   | { event: "done"; data: Record<string, never> }
   | { event: "error"; data: { message: string } };
+
+// ── Feedback patterns (GET /widget-inbox/feedback) ─────────────────────────
+
+export type FeedbackTally = { likes: number; dislikes: number; notes: number };
+
+export type FeedbackItem = {
+  messageId: string;
+  visitorId: string;
+  agent: { id: string; name: string; status: string; avatarUrl: string | null; model: string | null };
+  user: { id: string; name: string; isGuest: boolean } | null;
+  visitorName: string | null;
+  question: string | null;
+  reply: string;
+  model: string | null;
+  rating: "up" | "down" | null;
+  reason: string | null;
+  note: string | null;
+  ratedAt: string | null;
+  createdAt: string;
+  conversationStars: number | null;
+};
+
+export type FeedbackPatterns = {
+  range: { from: string; to: string; days: number };
+  totals: FeedbackTally & {
+    likeRate: number | null;
+    replies: number;
+    ratedShare: number | null;
+    conversationsRated: number;
+    averageStars: number | null;
+  };
+  byAgent: (FeedbackTally & {
+    agent: FeedbackItem["agent"];
+    likeRate: number | null;
+    replies: number;
+    ratedShare: number | null;
+    averageStars: number | null;
+    starRatings: number;
+  })[];
+  byModel: (FeedbackTally & { model: string; likeRate: number | null })[];
+  byReason: { up: { reason: string; count: number }[]; down: { reason: string; count: number }[] };
+  byDay: (FeedbackTally & { date: string })[];
+  byHour: (FeedbackTally & { hour: number })[];
+  byUser: (FeedbackTally & { label: string; user: { id: string; name: string } | null })[];
+  themes: { liked: { term: string; count: number }[]; disliked: { term: string; count: number }[] };
+  liked: FeedbackItem[];
+  disliked: FeedbackItem[];
+  notes: FeedbackItem[];
+};
+
+// ── Token usage (GET /ai-usage) ────────────────────────────────────────────
+
+export type UsageBucket = {
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  totalTokens: number;
+  costUsd: number;
+  avgLatencyMs: number | null;
+  cacheHitRate: number | null;
+};
+
+export type UsageAgent = { id: string; name: string; status: string; avatarUrl: string | null; model: string | null } | null;
+
+export type AiUsageReport = {
+  range: { from: string; to: string; days: number };
+  totals: UsageBucket & { avgTokensPerCall: number | null; tokenCountCalls: number };
+  byDay: (UsageBucket & { date: string })[];
+  byAgent: (UsageBucket & { agent: UsageAgent })[];
+  byModel: (UsageBucket & { model: string })[];
+  byOperation: (UsageBucket & { operation: string })[];
+  recent: {
+    id: string;
+    createdAt: string;
+    operation: string;
+    model: string;
+    agent: UsageAgent;
+    visitorId: string | null;
+    userId: string | null;
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+    latencyMs: number | null;
+    costUsd: number;
+  }[];
+  pricing: { model: string; inputPerMTok: number; outputPerMTok: number; cacheWritePerMTok: number; cacheReadPerMTok: number }[];
+};

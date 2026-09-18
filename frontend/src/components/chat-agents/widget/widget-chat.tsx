@@ -38,10 +38,10 @@ import {
 } from "@/components/chat-agents/widget/widget-chrome";
 import {
   ConversationRating,
-  MessageFeedback,
   RateChatButton,
   type MessageRating,
 } from "@/components/chat-agents/widget/widget-feedback";
+import { MessageActions } from "@/components/chat-agents/widget/widget-message-actions";
 import { DEFAULT_WIDGET_THEME, guidedChipsFor } from "@/lib/chat-agent-constants";
 import {
   fetchWidgetConfig,
@@ -113,6 +113,7 @@ function fromServer(messages: WidgetServerMessage[]): ChatMessage[] {
     text: m.content,
     rating: m.rating ?? null,
     feedbackNote: m.feedbackNote ?? null,
+    feedbackReason: m.feedbackReason ?? null,
   }));
 }
 
@@ -129,10 +130,16 @@ export function WidgetChat({
   agentKey,
   className,
   variant = "card",
+  startOnMessages = false,
+  onActivity,
 }: {
   agentKey: string;
   className?: string;
   variant?: WidgetChromeVariant;
+  /** Open straight on the thread with no home screen or back arrow — the in-app chat page. */
+  startOnMessages?: boolean;
+  /** Fires after every turn that reaches the server, so a chat list can refresh its preview line. */
+  onActivity?: () => void;
 }) {
   const [agent, setAgent] = useState<WidgetAgentPresentation | null>(null);
   const [bootError, setBootError] = useState<string | null>(null);
@@ -143,7 +150,7 @@ export function WidgetChat({
   const [composerError, setComposerError] = useState<string | null>(null);
   const [captureDone, setCaptureDone] = useState(() => hasCaptured(agentKey));
   const [captureThanks, setCaptureThanks] = useState(false);
-  const [tab, setTab] = useState<WidgetTab>("home");
+  const [tab, setTab] = useState<WidgetTab>(startOnMessages ? "messages" : "home");
 
   const [guidedFlow, setGuidedFlow] = useState<GuidedFlow | null>(null);
   const [flowMode, setFlowMode] = useState<WidgetFlowMode>("ai");
@@ -352,6 +359,7 @@ export function WidgetChat({
     setTab("messages");
     setMessages((m) => [...m, { id: uid(), from: "user", text }]);
     await streamReply(text);
+    onActivity?.();
   }
 
   async function pickChip(chip: WidgetChip) {
@@ -407,6 +415,7 @@ export function WidgetChat({
       }
     } finally {
       setStreaming(false);
+      onActivity?.();
     }
   }
 
@@ -418,12 +427,20 @@ export function WidgetChat({
 
   // ── Feedback ───────────────────────────────────────────────────────────────
 
-  async function rateMessage(message: ChatMessage, rating: MessageRating, note?: string | null) {
-    if (!message.serverId || !tokenRef.current) return;
-    const previous = { rating: message.rating ?? null, feedbackNote: message.feedbackNote ?? null };
-    setBubble(message.id, { rating, feedbackNote: note ?? null });
+  async function rateMessage(message: ChatMessage, rating: MessageRating, reason?: string | null, note?: string | null) {
+    if (!message.serverId) throw new Error("not_rateable");
+    const token = tokenRef.current ?? (await refreshTokenIfNeeded());
+    if (!token) throw new Error("no_session");
+    const previous = {
+      rating: message.rating ?? null,
+      feedbackNote: message.feedbackNote ?? null,
+      feedbackReason: message.feedbackReason ?? null,
+    };
+    // Optimistic: the chip flips at once, and flips back if the server refuses.
+    setBubble(message.id, { rating, feedbackNote: note ?? null, feedbackReason: rating ? (reason ?? null) : null });
     try {
-      await rateWidgetMessage({ token: tokenRef.current, messageId: message.serverId, rating, note });
+      await rateWidgetMessage({ token, messageId: message.serverId, rating, note, reason: rating ? (reason ?? null) : null });
+      onActivity?.();
     } catch {
       setBubble(message.id, previous);
       throw new Error("rating_failed");
@@ -519,7 +536,7 @@ export function WidgetChat({
             avatarUrl={agent.avatarUrl}
             title={agent.name || "Assistant"}
             subtitle={handedOff ? "Handoff requested" : conversationRating ? `You rated this chat ${conversationRating}/5` : undefined}
-            onBack={() => setTab("home")}
+            onBack={startOnMessages ? undefined : () => setTab("home")}
           />
 
           <WidgetMessages theme={theme} underHeader>
@@ -527,7 +544,7 @@ export function WidgetChat({
             {messages.map((m, i) => {
               const isRateable = m.from === "bot" && Boolean(m.serverId) && !m.failed && m.text.trim();
               return (
-                <div key={m.id}>
+                <div key={m.id} className="group/msg">
                   <WidgetBubble
                     theme={theme}
                     from={m.from}
@@ -548,12 +565,14 @@ export function WidgetChat({
                     )}
                   </WidgetBubble>
                   {isRateable ? (
-                    <MessageFeedback
+                    <MessageActions
                       theme={theme}
+                      text={m.text}
                       rating={m.rating ?? null}
-                      note={m.feedbackNote}
+                      reason={m.feedbackReason ?? null}
+                      note={m.feedbackNote ?? null}
                       disabled={streaming}
-                      onRate={(rating, note) => rateMessage(m, rating, note)}
+                      onRate={(rating, reason, note) => rateMessage(m, rating, reason, note)}
                     />
                   ) : null}
                 </div>

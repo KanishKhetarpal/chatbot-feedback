@@ -17,6 +17,14 @@ export type AvailableChatAgent = {
   model: string;
   updatedAt: string;
   conversationCount: number;
+  /** The signed-in account's own conversation with this chatbot, if they have started one. */
+  myThread: {
+    visitorId: string;
+    lastSeenAt: string;
+    messageCount: number;
+    rating: number | null;
+    lastMessage: { role: "user" | "assistant"; preview: string; at: string } | null;
+  } | null;
 };
 
 export const useGetAvailableChatAgents = () =>

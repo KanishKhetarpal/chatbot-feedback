@@ -1,6 +1,6 @@
 import { ReactNode, useState } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Bot, Inbox, LogOut, Menu, MessageSquare, Users, X } from "lucide-react";
+import { Bot, Gauge, Inbox, LogOut, Menu, MessageSquare, ThumbsUp, Users, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { useUserStore } from "@/store/use-user-store";
@@ -14,6 +14,8 @@ const NAV: NavItem[] = [
   { to: "/chat", label: "Chat", icon: MessageSquare },
   { to: "/", label: "Chatbots", icon: Bot, exact: true, adminOnly: true },
   { to: "/conversations", label: "Conversations", icon: Inbox, adminOnly: true },
+  { to: "/feedback", label: "Feedback", icon: ThumbsUp, adminOnly: true },
+  { to: "/usage", label: "Usage", icon: Gauge, adminOnly: true },
   { to: "/users", label: "Users", icon: Users, adminOnly: true },
 ];
 

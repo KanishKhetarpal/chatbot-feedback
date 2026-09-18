@@ -58,8 +58,12 @@ export class ChatAgentsService {
     return rows.map((row) => this.toApi(row));
   }
 
-  /** Active chatbots, presentation fields only — the gallery a tester sees. */
-  async listAvailable() {
+  /**
+   * Active chatbots, presentation fields only — the gallery a tester sees.
+   * With a `userId`, each one also carries that account's own thread on it
+   * (`myThread`), which is what the chat list draws its preview line from.
+   */
+  async listAvailable(userId?: string) {
     const rows = await this.prisma.chatAgent.findMany({
       where: { status: 'active' },
       orderBy: { name: 'asc' },
@@ -77,11 +81,45 @@ export class ChatAgentsService {
         _count: { select: { visitors: true } },
       },
     });
-    return rows.map(({ _count, theme, ...row }) => ({
-      ...row,
-      theme: resolveTheme(theme),
-      conversationCount: _count.visitors,
-    }));
+    const mine =
+      userId && rows.length
+        ? await this.prisma.chatWidgetVisitor.findMany({
+            where: { userId, agentId: { in: rows.map((r) => r.id) } },
+            orderBy: { lastSeenAt: 'desc' },
+            select: {
+              id: true,
+              agentId: true,
+              lastSeenAt: true,
+              messageCount: true,
+              rating: true,
+              messages: { orderBy: { createdAt: 'desc' }, take: 1, select: { role: true, content: true, createdAt: true } },
+            },
+          })
+        : [];
+    // Newest thread per chatbot wins - an account may hold one per browser.
+    const threadByAgent = new Map<string, (typeof mine)[number]>();
+    for (const v of mine) if (!threadByAgent.has(v.agentId)) threadByAgent.set(v.agentId, v);
+
+    return rows.map(({ _count, theme, ...row }) => {
+      const t = threadByAgent.get(row.id);
+      const last = t?.messages[0];
+      return {
+        ...row,
+        theme: resolveTheme(theme),
+        conversationCount: _count.visitors,
+        myThread: t
+          ? {
+              visitorId: t.id,
+              lastSeenAt: t.lastSeenAt,
+              messageCount: t.messageCount,
+              rating: t.rating,
+              lastMessage: last
+                ? { role: last.role as 'user' | 'assistant', preview: last.content.slice(0, 140), at: last.createdAt }
+                : null,
+            }
+          : null,
+      };
+    });
   }
 
   async getOne(id: string) {

@@ -169,6 +169,7 @@ export class InboxService {
         chipNodeId: true,
         rating: true,
         feedbackNote: true,
+        feedbackReason: true,
         ratedAt: true,
       },
     });

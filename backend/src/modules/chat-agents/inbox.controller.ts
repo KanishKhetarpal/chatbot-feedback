@@ -6,6 +6,8 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CHAT_AGENT_ROLES } from './chat-agents.constants';
 import { ListInboxQueryDto } from './dto/list-inbox-query.dto';
 import { ReviewThreadDto } from './dto/review-thread.dto';
+import { FeedbackPatternsQueryDto } from './dto/feedback-patterns-query.dto';
+import { FeedbackPatternsService } from './feedback-patterns.service';
 import { InboxService } from './inbox.service';
 
 class AgentScopeQueryDto {
@@ -23,7 +25,10 @@ class AgentScopeQueryDto {
 @Roles(...CHAT_AGENT_ROLES)
 @Controller('widget-inbox')
 export class InboxController {
-  constructor(private readonly inbox: InboxService) {}
+  constructor(
+    private readonly inbox: InboxService,
+    private readonly patterns: FeedbackPatternsService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Conversations, most recently active first' })
@@ -35,6 +40,15 @@ export class InboxController {
   @ApiOperation({ summary: 'Feedback headline numbers (all chatbots or one)' })
   stats(@Query() query: AgentScopeQueryDto) {
     return this.inbox.stats(query.agentId);
+  }
+
+  @Get('feedback')
+  @ApiOperation({
+    summary:
+      'Feedback patterns: likes / dislikes over time, by chatbot, reason, model and tester, plus the liked and disliked replies themselves',
+  })
+  feedback(@Query() query: FeedbackPatternsQueryDto) {
+    return this.patterns.report(query);
   }
 
   @Get('export')

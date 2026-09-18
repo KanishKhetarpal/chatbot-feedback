@@ -9,6 +9,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { AiModule } from './modules/ai/ai.module';
 import { ChatAgentsModule } from './modules/chat-agents/chat-agents.module';
+import { AiUsageModule } from './modules/ai-usage/ai-usage.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ChatAgentsModule } from './modules/chat-agents/chat-agents.module';
     UsersModule,
     AiModule,
     ChatAgentsModule,
+    AiUsageModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
