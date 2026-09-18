@@ -113,7 +113,7 @@ API: `GET /widget-inbox`, `/stats`, `/export`, `/:visitorId`, `PATCH /:visitorId
 
 1. New project → **Deploy from GitHub repo**, root directory `backend`.
 2. Add a **PostgreSQL** plugin; Railway injects `DATABASE_URL`.
-3. Set the variables from §3 (`ANTHROPIC_API_KEY`, both JWT secrets, `ADMIN_*`, `FRONTEND_URL=https://<your-vercel-domain>`, `NODE_ENV=production`).
+3. Set the variables: paste [`backend/.env.railway.example`](backend/.env.railway.example) into the service's **Variables → Raw Editor**, then fill in `ANTHROPIC_API_KEY` and the two JWT secrets (`openssl rand -hex 32` each).
 4. [`backend/railway.json`](backend/railway.json) already sets the build (`pnpm prisma generate && pnpm build`) and start (`npx prisma migrate deploy && node dist/main`) commands.
 5. After the first deploy, run the seed once from the Railway shell: `pnpm db:seed`.
 

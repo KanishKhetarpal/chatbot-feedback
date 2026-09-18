@@ -8,3 +8,10 @@ dist/
 coverage/
 backend/generated/
 frontend/src/routeTree.gen.ts
+
+.vercel
+.env*
+
+# Templates stay tracked; real env files never are.
+!.env.example
+!.env.railway.example
