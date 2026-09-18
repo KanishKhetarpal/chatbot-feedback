@@ -1,0 +1,23 @@
+# Local PostgreSQL for Chatbot Feedback. Port 5440 so it does not clash with a
+# CRM database already running on 5432/5433.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: chatbot_feedback_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: chatbot
+      POSTGRES_PASSWORD: chatbot
+      POSTGRES_DB: chatbot_feedback
+    ports:
+      - '5440:5432'
+    volumes:
+      - chatbot_feedback_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U chatbot -d chatbot_feedback']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  chatbot_feedback_pg:

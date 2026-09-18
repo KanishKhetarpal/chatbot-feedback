@@ -1,0 +1,313 @@
+// Chatbot Feedback — Prisma schema
+//
+// A trimmed, self-contained copy of the CRM's `chat-agents` tables plus the two
+// things this app adds on top: real user accounts (admin / user) and feedback
+// columns on the recorded conversations.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Accounts
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Two roles only. `admin` configures chatbots and reviews conversations;
+/// `user` can open and talk to every active chatbot.
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  /// Sign-in name for staff accounts (the admin signs in as "admin"). Null for guests.
+  username     String?   @unique
+  name         String
+  passwordHash String
+  role         String    @default("user") // admin | user
+  /// Created by the one-click "Sign in" on the login page. No password, no username.
+  isGuest      Boolean   @default(false)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  createdAgents ChatAgent[]         @relation("ChatAgentCreator")
+  visitors      ChatWidgetVisitor[] @relation("VisitorUser")
+  reviews       ChatWidgetVisitor[] @relation("VisitorReviewer")
+
+  @@index([role])
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Chatbots (kept under the CRM's `ChatAgent` name so the ported code is unchanged)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ChatAgent {
+  id           String  @id @default(uuid())
+  name         String
+  description  String? // internal only — never sent to the model or the widget
+  instructions String? @db.Text
+  status       String  @default("draft") // draft | active | paused
+
+  avatarUrl        String?
+  heading          String?
+  subheading       String?
+  greeting         String?  @db.Text
+  messagePresets   String[] @default([])
+  inputPlaceholder String?
+
+  tone             String   @default("friendly") // professional | friendly | casual | formal | empathetic
+  responseLength   String   @default("balanced") // concise | balanced | detailed
+  language         String   @default("auto")
+  useEmoji         Boolean  @default(false)
+  knowledgeMode    String   @default("strict") // strict | blended
+  fallbackMessage  String?  @db.Text
+  restrictedTopics String[] @default([])
+
+  handoffTriggers   String[] @default([])
+  handoffMessage    String?  @db.Text
+  handoffOnFallback Int      @default(2)
+
+  leadCapture String   @default("never") // never | before_chat | after_first_reply
+  leadFields  String[] @default(["phone"])
+
+  /// When true the persona also asks one qualifying question per turn.
+  qualificationEnabled Boolean @default(true)
+
+  /// Guided chip decision tree. Null = feature off; the widget falls back to
+  /// `messagePresets`. Written only by `PUT /chat-agents/:id/guided-flow`.
+  guidedFlow Json?
+
+  model     String @default("claude-sonnet-5")
+  effort    String @default("medium") // low | medium | high
+  maxTokens Int    @default(1024)
+
+  /// Public key used by share links and the embed script. Safe to be public.
+  publicKey      String   @unique
+  /// Extra websites allowed to embed this bot. The app's own origin is always allowed.
+  allowedOrigins String[] @default([])
+  theme          Json?
+
+  /// The pack this agent answers from. NULL = never trained; cannot be activated.
+  activePackId String?
+
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  createdBy        User?                      @relation("ChatAgentCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  knowledgeSources ChatAgentKnowledgeSource[]
+  packs            ChatAgentKnowledgePack[]
+  visitors         ChatWidgetVisitor[]
+
+  @@index([createdByUserId])
+  @@index([status])
+  @@map("chat_agents")
+}
+
+model ChatAgentKnowledgeSource {
+  id      String @id @default(uuid())
+  agentId String
+  name    String
+
+  /// text | website | file | qa | integration — `text` and `file` ingest today.
+  type String
+
+  /// Inline body for `text`; the rendered table for `file`.
+  location    String  @db.Text
+  description String? @db.Text
+  fileName    String?
+  rowCount    Int?
+  sheetCount  Int?
+
+  status     String    @default("pending") // pending | processing | ready | failed
+  error      String?   @db.Text
+  chunkCount Int       @default(0)
+  lastSynced DateTime?
+
+  enabled Boolean @default(true)
+
+  contentBytes Int  @default(0)
+  fileBytes    Int?
+
+  contentHash  String?
+  embeddedHash String?
+  embeddedAt   DateTime?
+
+  mimeType   String?
+  storageKey String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agent  ChatAgent                 @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  chunks ChatAgentKnowledgeChunk[]
+
+  @@index([agentId])
+  @@index([agentId, type])
+  @@index([agentId, enabled])
+  @@map("chat_agent_knowledge_sources")
+}
+
+model ChatAgentKnowledgeChunk {
+  id       String  @id @default(uuid())
+  sourceId String
+  content  String  @db.Text
+  position Int     @default(0)
+  origin   String?
+
+  createdAt DateTime @default(now())
+
+  source ChatAgentKnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId])
+  @@map("chat_agent_knowledge_chunks")
+}
+
+model ChatAgentKnowledgePack {
+  id      String @id @default(uuid())
+  agentId String
+  version Int
+
+  content      String @db.Text
+  packHash     String
+  sourceHashes Json
+  sourceCount  Int
+  tokenCount   Int
+  model        String
+
+  builtByUserId String?
+  builtAt       DateTime @default(now())
+
+  agent ChatAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, version])
+  @@index([agentId])
+  @@map("chat_agent_knowledge_packs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Recorded conversations
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// One thread per browser (or per signed-in tester) per chatbot.
+///
+/// `userId` is set when the conversation was held inside the app by a signed-in
+/// account; it stays NULL for anonymous share-link visitors. Never a
+/// precondition for storing or listing a conversation.
+model ChatWidgetVisitor {
+  id      String @id @default(uuid())
+  agentId String
+
+  firstSeenAt  DateTime @default(now())
+  lastSeenAt   DateTime @default(now())
+  messageCount Int      @default(0)
+
+  /// The signed-in tester, when there is one.
+  userId String?
+
+  // ── What the visitor tells us ─────────────────────────────────────────────
+  name           String?
+  phone          String?
+  email          String?
+  location       String?
+  courseInterest String?
+
+  // ── Read from the request ─────────────────────────────────────────────────
+  ipAddress  String?
+  userAgent  String? @db.Text
+  browser    String?
+  os         String?
+  deviceType String?
+  timezone   String?
+  language   String?
+  pageUrl    String? @db.Text
+  referrer   String? @db.Text
+
+  /// Free-form facts the bot may merge into chip answers (`{{firstName}}`).
+  custom       Json?
+  fieldSources Json?
+  handoffAt    DateTime?
+
+  currentNodeId      String?
+  guidedFlowExitedAt DateTime?
+
+  // ── Feedback on the whole conversation (left by the person chatting) ──────
+  /// 1–5 stars.
+  rating        Int?
+  ratingComment String?   @db.Text
+  ratedAt       DateTime?
+
+  // ── Review by an admin ────────────────────────────────────────────────────
+  reviewStatus     String    @default("pending") // pending | reviewed | flagged
+  reviewNote       String?   @db.Text
+  reviewedAt       DateTime?
+  reviewedByUserId String?
+
+  agent      ChatAgent           @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  user       User?               @relation("VisitorUser", fields: [userId], references: [id], onDelete: SetNull)
+  reviewedBy User?               @relation("VisitorReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  messages   ChatWidgetMessage[]
+
+  @@index([agentId])
+  @@index([agentId, lastSeenAt])
+  @@index([userId])
+  @@index([reviewStatus])
+  @@map("chat_widget_visitors")
+}
+
+/// Every turn of every conversation, in order.
+model ChatWidgetMessage {
+  id        String @id @default(uuid())
+  visitorId String
+
+  /// `user` or `assistant`.
+  role    String
+  content String @db.Text
+
+  model            String?
+  inputTokens      Int?
+  outputTokens     Int?
+  cacheReadTokens  Int?
+  cacheWriteTokens Int?
+  latencyMs        Int?
+  packVersion      Int?
+
+  chipNodeId String?
+
+  // ── Per-message feedback (assistant rows only) ────────────────────────────
+  /// `up` | `down`
+  rating       String?
+  feedbackNote String?   @db.Text
+  ratedAt      DateTime?
+
+  createdAt DateTime @default(now())
+
+  visitor ChatWidgetVisitor @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+
+  @@index([visitorId, createdAt])
+  @@index([createdAt])
+  @@index([rating])
+  @@map("chat_widget_messages")
+}
+
+model ChatWidgetRateLimit {
+  id String @id @default(uuid())
+
+  scope String // visitor | agent
+  key   String
+
+  windowStart  DateTime  @default(now())
+  count        Int       @default(0)
+  blockedUntil DateTime?
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([scope, key])
+  @@index([blockedUntil])
+  @@map("chat_widget_rate_limits")
+}

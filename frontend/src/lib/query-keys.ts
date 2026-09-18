@@ -1,0 +1,14 @@
+export const QUERY_KEYS = {
+  GET_ME: "get-me",
+  GET_USERS: "get-users",
+  GET_CHAT_AGENTS: "get-chat-agents",
+  GET_AVAILABLE_CHAT_AGENTS: "get-available-chat-agents",
+  GET_CHAT_AGENT: "get-chat-agent",
+  GET_CHAT_AGENT_OPTIONS: "get-chat-agent-options",
+  GET_KNOWLEDGE_SOURCES: "get-knowledge-sources",
+  GET_KNOWLEDGE_SOURCE: "get-knowledge-source",
+  GET_KNOWLEDGE_SUMMARY: "get-knowledge-summary",
+  GET_WIDGET_INBOX_THREADS: "get-widget-inbox-threads",
+  GET_WIDGET_INBOX_THREAD: "get-widget-inbox-thread",
+  GET_WIDGET_INBOX_STATS: "get-widget-inbox-stats",
+} as const;
