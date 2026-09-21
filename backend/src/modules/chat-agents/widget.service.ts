@@ -21,6 +21,18 @@ import { resolveTheme } from './widget-theme';
 import { buildVisitorContext } from './visitor-context.util';
 import { GuidedFlowRuntimeService } from './guided-flow-runtime.service';
 import { formatKnownFacts, type VisitorFacts } from './qualifier.util';
+import { detectPhone, extractFactsTag, looksLikeName, type ExtractedFacts } from './lead-extract.util';
+import { composeStored, extractReplyParts } from './ui-block.util';
+import {
+  AUTO_MARKER,
+  autoLeadMessage,
+  detectName,
+  isLeadForm,
+  requireContact,
+  LEAD_GATE_AFTER,
+  LEAD_SOFT_AFTER,
+  withoutKnownFields,
+} from './lead-flow.util';
 import { WidgetRateLimitService } from './widget-rate-limit.service';
 import { InvalidVisitorTokenError, issueVisitorToken, readVisitorToken } from './widget-token.util';
 import type { TestChatAgentDto } from './dto/test-chat-agent.dto';
@@ -42,6 +54,24 @@ export interface RequestContext {
   /** The signed-in account, when the chat happens inside the app. */
   userId?: string;
 }
+
+/** Follow-ups a quiet visitor can receive in one conversation. */
+const NUDGE_LIMIT = 2;
+
+/** What a rule-based bot says if a typed message reaches it anyway. Never stored, never sent to the model. */
+const NO_AI_REPLY = 'I answer from the options below. Pick the one closest to your question.';
+
+function isNoAiFlow(flow: unknown): boolean {
+  return Boolean(flow && typeof flow === 'object' && (flow as { noAi?: unknown }).noAi === true);
+}
+
+/** Sent in place of a visitor message when the widget asks for a follow-up. Never stored. */
+const NUDGE_INSTRUCTION = [
+  '[NO NEW MESSAGE: the visitor has been quiet for about a minute after your last reply.]',
+  'Send ONE short follow-up that re-engages them, in your own persona. Do not repeat your last reply. Do not mention the silence at all: no "still there", "still around", "no pressure" or similar; just continue as if with a fresh, useful thought.',
+  'Open a loop they will want to close: one concrete, useful thing that fits the conversation so far (something about the topic they cared about that they have not seen yet, a comparison, a check you can run for them) and end with one easy question. Do not ask for their name or number in this message, and use a photo only if seeing the place is the point.',
+  'One or two short lines of text, then suggested replies in <next>. No element unless it directly serves that next step.',
+].join('\n');
 
 /** Turns sent to the model. The knowledge pack, not the transcript, answers the question. */
 const MAX_HISTORY = 20;
@@ -211,6 +241,8 @@ export class WidgetService {
       if (payload.a !== agentId) return null;
       const existing = await this.prisma.chatWidgetVisitor.findUnique({ where: { id: payload.v } });
       if (!existing || existing.agentId !== agentId) return null;
+      // Another signed-in person's thread (same browser, new tester): start fresh.
+      if (existing.userId && userId && existing.userId !== userId) return null;
       return await this.prisma.chatWidgetVisitor.update({
         where: { id: existing.id },
         data: {
@@ -233,6 +265,19 @@ export class WidgetService {
 
     this.assertOriginAllowed(agent.allowedOrigins, origin);
     this.assertActive(agent.status);
+
+    // A rule-based bot never reaches the model: no typed questions, no AI follow-ups.
+    if (isNoAiFlow(agent.guidedFlow)) {
+      return {
+        reply: dto.nudge ? null : NO_AI_REPLY,
+        limited: false,
+        retryAt: null,
+        usage: null,
+        visitorToken: null,
+        assistantMessageId: null,
+        ...(dto.nudge ? { nudgeRefused: 'rule_based' } : {}),
+      };
+    }
 
     // Agent scope first, before any visitor exists — the ceiling that bounds spend.
     const agentVerdict = await this.limits.consumeAgent(agent.id);
@@ -267,13 +312,47 @@ export class WidgetService {
     }
 
     const facts = agent.qualificationEnabled ? await this.loadVisitorFacts(visitor.id) : null;
+    const contact = facts ?? (await this.loadVisitorFacts(visitor.id));
+    const botReplies = await this.countBotReplies(visitor.id);
+
+    // Compulsory details: once the gate form has been shown, nothing more until a number is left.
+    const leadState = await this.leadState(visitor.id);
+    if (!contact?.phone && leadState.gateShown) {
+      return {
+        reply: dto.nudge ? null : autoLeadMessage('gate', contact),
+        limited: false,
+        retryAt: null,
+        usage: null,
+        visitorToken: issued,
+        assistantMessageId: null,
+        ...(dto.nudge ? { nudgeRefused: 'details_required' } : {}),
+      };
+    }
+
+    // A follow-up to a quiet visitor: allowed only after a bot turn, once per
+    // silence, and at most NUDGE_LIMIT times in a conversation.
+    if (dto.nudge) {
+      const refused = await this.refuseNudge(visitor.id, history);
+      if (refused) {
+        return {
+          reply: null,
+          limited: false,
+          retryAt: null,
+          usage: null,
+          visitorToken: issued,
+          assistantMessageId: null,
+          nudgeRefused: refused,
+        };
+      }
+    }
+    const turnMessage = dto.nudge ? NUDGE_INSTRUCTION : dto.message;
 
     const askedAt = new Date();
     const { result, latencyMs } = await this.runTurn(
       agent,
       pack.content,
       history,
-      dto.message,
+      turnMessage,
       {
         feature: 'chat_widget',
         actorType: request?.userId ? 'user' : 'visitor',
@@ -287,10 +366,57 @@ export class WidgetService {
       facts,
     );
 
+    // The model reports what it learned in a hidden tag at the end of its reply.
+    // Strip it before anything is stored or shown, and keep the facts.
+    const { text: factFree, facts: learned } = extractFactsTag(result.text);
+    // Then the element, photos and follow-ups, validated and stored in canonical form.
+    const parts = extractReplyParts(factFree);
+    this.logger.log(
+      `agent=${agent.id} reply tags: ui=${/<ui>/.test(result.text) ? 1 : 0} media=${/<media>/.test(result.text) ? 1 : 0} ` +
+        `next=${/<next>/.test(result.text) ? 1 : 0} out=${result.usage.outputTokens}${dto.nudge ? ' (nudge)' : ''}`,
+    );
+    if (parts.rejected) this.logger.warn(`agent=${agent.id} dropped an invalid <ui> block: ${parts.reason}`);
+    if (!dto.nudge) {
+      const fallbackPhone = detectPhone(dto.message);
+      if (fallbackPhone && !learned.mobile) learned.mobile = fallbackPhone;
+      const fallbackName = detectName(dto.message);
+      if (fallbackName && !learned.name && !contact?.name) learned.name = fallbackName;
+    }
+    // Never ask again for what the visitor already gave (this message included).
+    const knownNow = {
+      name: contact?.name || learned.name || null,
+      phone: contact?.phone || learned.mobile || null,
+      email: contact?.email || learned.email || null,
+    };
+    parts.ui = requireContact(withoutKnownFields(parts.ui, knownNow), knownNow);
+    if (isLeadForm(parts.ui)) parts.next = [];
+    const cleanReply = composeStored(parts);
+    if (agent.qualificationEnabled && !dto.nudge) {
+      await this.persistFacts(visitor.id, learned, facts);
+    }
+
+    // The lead rules: after the 3rd reply a details form (skippable, once);
+    // from the 6th, a compulsory one. Each arrives as its own message.
+    // Exactly at the 3rd reply (skippable) and the 6th (compulsory). If the reply
+    // is itself a question (a quiz step), the widget keeps that question
+    // answerable beside the skippable form; the compulsory one replaces it.
+    let followup: string | null = null;
+    if (!knownNow.phone && !dto.nudge) {
+      const replies = botReplies + 1;
+      if (replies >= LEAD_GATE_AFTER) {
+        followup = autoLeadMessage('gate', knownNow);
+        await this.markLead(visitor.id, 'leadGateShown');
+      } else if (replies >= LEAD_SOFT_AFTER && !leadState.softShown) {
+        await this.markLead(visitor.id, 'leadSoftShown');
+        if (!isLeadForm(parts.ui)) followup = autoLeadMessage('soft', knownNow);
+      }
+    }
+    const cleaned = { ...result, text: cleanReply };
+
     const stored = await this.recordTurn(
       visitor.id,
-      dto.message,
-      result,
+      dto.nudge ? null : dto.message,
+      cleaned,
       latencyMs,
       pack.version,
       agent.model,
@@ -303,15 +429,44 @@ export class WidgetService {
         `cacheRead=${result.usage.cacheReadTokens} cacheWrite=${result.usage.cacheWriteTokens}`,
     );
 
+    // Stored after the reply, so a reloaded thread shows it in the same place.
+    const followupRow = followup
+      ? await this.prisma.chatWidgetMessage.create({
+          data: { visitorId: visitor.id, role: 'assistant', content: followup, createdAt: new Date(Date.now() + 1) },
+          select: { id: true },
+        })
+      : null;
+
     return {
-      reply: result.text,
+      reply: cleaned.text,
       limited: false,
       retryAt: null,
       usage: result.usage,
       visitorToken: issued,
       /** So the widget can attach a thumbs-up/down to this exact reply. */
       assistantMessageId: stored?.assistantMessageId ?? null,
+      /** A second bot message (the lead form), shown right after the reply. */
+      followup: followup && followupRow ? { id: followupRow.id, content: followup } : null,
     };
+  }
+
+  /** Bot replies so far, leaving out the lead forms the server adds itself. */
+  private countBotReplies(visitorId: string) {
+    return this.prisma.chatWidgetMessage.count({
+      where: { visitorId, role: 'assistant', NOT: { content: { contains: AUTO_MARKER } } },
+    });
+  }
+
+  private async leadState(visitorId: string) {
+    const row = await this.prisma.chatWidgetVisitor.findUnique({ where: { id: visitorId }, select: { custom: true } });
+    const custom = ((row?.custom ?? {}) as Record<string, unknown>) || {};
+    return { softShown: Boolean(custom.leadSoftShown), gateShown: Boolean(custom.leadGateShown) };
+  }
+
+  private async markLead(visitorId: string, flag: 'leadSoftShown' | 'leadGateShown') {
+    const row = await this.prisma.chatWidgetVisitor.findUnique({ where: { id: visitorId }, select: { custom: true } });
+    const custom = ((row?.custom ?? {}) as Record<string, unknown>) || {};
+    await this.prisma.chatWidgetVisitor.update({ where: { id: visitorId }, data: { custom: { ...custom, [flag]: true } as object } });
   }
 
   private async resolveChatAgent(dto: VisitorIdentity) {
@@ -348,7 +503,9 @@ export class WidgetService {
           messages: { orderBy: { createdAt: 'desc' }, take: MAX_HISTORY, select: { role: true, content: true } },
         },
       });
-      if (existing && existing.agentId === agentId) {
+      // A thread belonging to a different signed-in person is never continued.
+      const otherUser = Boolean(existing?.userId && request?.userId && existing.userId !== request.userId);
+      if (existing && existing.agentId === agentId && !otherUser) {
         if (request?.userId && !existing.userId) {
           await this.prisma.chatWidgetVisitor.update({ where: { id: existing.id }, data: { userId: request.userId } });
         }
@@ -378,7 +535,10 @@ export class WidgetService {
         ...context,
         ...(request?.userId ? { userId: request.userId } : {}),
         // A guest's row carries a placeholder email; only its name is worth keeping.
+        // The source is recorded so the counsellor prompt still asks the person
+        // who they are — an account label ("Guest 3f2a", "Admin") is not a lead.
         ...(account ? (account.isGuest ? { name: account.name } : { name: account.name, email: account.email }) : {}),
+        ...(account ? { fieldSources: { name: 'account', ...(account.isGuest ? {} : { email: 'account' }) } } : {}),
       },
       select: { id: true },
     });
@@ -423,6 +583,7 @@ export class WidgetService {
         fieldSources: true,
         timezone: true,
         name: true,
+        phone: true,
       },
     });
 
@@ -498,8 +659,11 @@ export class WidgetService {
       this.training.getTrainingState(agentId),
     ]);
 
+    const { text: factFree, facts: learned } = extractFactsTag(result.text);
+    const reply = composeStored(extractReplyParts(factFree));
     return {
-      reply: result.text,
+      reply,
+      learned,
       agent: {
         id: agent.id,
         name: agent.name,
@@ -537,14 +701,37 @@ export class WidgetService {
 
   private async recordTurn(
     visitorId: string,
-    question: string,
+    /** Null for a nudge: the bot speaks without a visitor message before it. */
+    question: string | null,
     result: { text: string; usage: ChatUsage },
     latencyMs: number,
     packVersion: number,
     model: string,
     askedAt: Date,
-  ): Promise<{ userMessageId: string; assistantMessageId: string } | null> {
+  ): Promise<{ userMessageId: string | null; assistantMessageId: string } | null> {
     try {
+      if (question === null) {
+        const [assistantMsg] = await this.prisma.$transaction([
+          this.prisma.chatWidgetMessage.create({
+            data: {
+              visitorId,
+              role: 'assistant',
+              content: result.text,
+              model,
+              inputTokens: result.usage.inputTokens,
+              outputTokens: result.usage.outputTokens,
+              cacheReadTokens: result.usage.cacheReadTokens,
+              cacheWriteTokens: result.usage.cacheWriteTokens,
+              latencyMs,
+              packVersion,
+              createdAt: new Date(),
+            },
+            select: { id: true },
+          }),
+          this.prisma.chatWidgetVisitor.update({ where: { id: visitorId }, data: { lastSeenAt: new Date() } }),
+        ]);
+        return { userMessageId: null, assistantMessageId: assistantMsg.id };
+      }
       const [userMsg, assistantMsg] = await this.prisma.$transaction([
         this.prisma.chatWidgetMessage.create({
           data: { visitorId, role: 'user', content: question, createdAt: askedAt },
@@ -576,6 +763,22 @@ export class WidgetService {
       this.logger.error(`Answered but could not store the turn for visitor ${visitorId}: ${(error as Error)?.message}`);
       return null;
     }
+  }
+
+  /** Why a nudge may not be sent now, or null when it may. */
+  private async refuseNudge(visitorId: string, history: WidgetChatMessageDto[]): Promise<string | null> {
+    const last = history[history.length - 1];
+    if (!last || last.role !== 'assistant') return 'not_after_bot_turn';
+    if (history.length >= 2 && history[history.length - 2].role === 'assistant') return 'already_nudged';
+    const row = await this.prisma.chatWidgetVisitor.findUnique({ where: { id: visitorId }, select: { custom: true } });
+    const custom = ((row?.custom ?? {}) as Record<string, unknown>) || {};
+    const count = Number(custom.nudges ?? 0);
+    if (count >= NUDGE_LIMIT) return 'limit_reached';
+    await this.prisma.chatWidgetVisitor.update({
+      where: { id: visitorId },
+      data: { custom: { ...custom, nudges: count + 1 } as object },
+    });
+    return null;
   }
 
   private async loadPack(activePackId: string | null) {
@@ -628,10 +831,86 @@ export class WidgetService {
   }
 
   private async loadVisitorFacts(visitorId: string): Promise<VisitorFacts | null> {
-    return this.prisma.chatWidgetVisitor.findUnique({
+    const row = await this.prisma.chatWidgetVisitor.findUnique({
       where: { id: visitorId },
-      select: { name: true, phone: true, email: true, location: true, courseInterest: true, custom: true },
+      select: { name: true, phone: true, email: true, location: true, courseInterest: true, custom: true, fieldSources: true },
     });
+    if (!row) return null;
+    const sources = ((row.fieldSources ?? {}) as Record<string, string>) || {};
+    // A name copied from the tester's account is not something the visitor told
+    // us, so the bot should still ask. Same for the account email.
+    return {
+      name: sources.name === 'account' ? null : row.name,
+      phone: row.phone,
+      email: sources.email === 'account' ? null : row.email,
+      location: row.location,
+      courseInterest: row.courseInterest,
+      custom: row.custom,
+    };
+  }
+
+  /**
+   * Write what the bot learned this turn onto the visitor row. Columns for the
+   * fields the inbox shows (name, phone, email, course, location); everything
+   * else goes into `custom` so the KNOWN FACTS block carries it next turn.
+   * A value already given by the visitor is never overwritten by the model's
+   * paraphrase — only by the visitor saying something new (later turn wins).
+   */
+  private async persistFacts(visitorId: string, learned: ExtractedFacts, known: VisitorFacts | null) {
+    const entries = Object.entries(learned).filter(([, v]) => v && v.trim());
+    if (entries.length === 0) return;
+
+    const row = await this.prisma.chatWidgetVisitor.findUnique({
+      where: { id: visitorId },
+      select: { custom: true, fieldSources: true, name: true },
+    });
+    if (!row) return;
+    const custom = { ...(((row.custom ?? {}) as Record<string, unknown>) || {}) };
+    const sources = { ...(((row.fieldSources ?? {}) as Record<string, string>) || {}) };
+    const data: Record<string, unknown> = {};
+
+    for (const [key, raw] of entries) {
+      const value = raw!.trim();
+      switch (key) {
+        case 'name':
+          if (!looksLikeName(value)) break;
+          data.name = value;
+          custom.firstName = value.split(/\s+/)[0];
+          sources.name = 'chat';
+          break;
+        case 'mobile':
+          data.phone = value;
+          sources.phone = 'chat';
+          break;
+        case 'email':
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) break;
+          data.email = value.toLowerCase();
+          sources.email = 'chat';
+          break;
+        case 'courseInterest':
+          data.courseInterest = value;
+          custom.courseInterest = value;
+          sources.courseInterest = 'chat';
+          break;
+        case 'city':
+          data.location = value;
+          custom.city = value;
+          sources.city = 'chat';
+          break;
+        default:
+          custom[key] = value;
+          sources[`custom.${key}`] = 'chat';
+      }
+    }
+
+    await this.prisma.chatWidgetVisitor.update({
+      where: { id: visitorId },
+      data: { ...data, custom: custom as object, fieldSources: sources as object },
+    });
+    this.logger.log(
+      `facts agent-visitor=${visitorId} learned=${Object.keys(learned).join(',')}` +
+        (known ? '' : ' (no prior facts)'),
+    );
   }
 
   // ── Contact capture ────────────────────────────────────────────────────────

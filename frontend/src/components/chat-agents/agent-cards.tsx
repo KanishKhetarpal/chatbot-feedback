@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowUpRight, Bot, Plus } from "lucide-react";
 
+import { ChatAgentActionsMenu } from "@/components/chat-agents/delete-agent";
 import { Badge } from "@/components/ui-kit";
 import { getChatAgentStatusTone } from "@/lib/chat-agent-constants";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,7 @@ export function ChatAgentCard({ agent }: { agent: ChatAgent }) {
       : null;
 
   return (
+    <div className="relative h-full">
     <Link
       to="/agents/$agentId"
       params={{ agentId: agent.id }}
@@ -69,7 +71,9 @@ export function ChatAgentCard({ agent }: { agent: ChatAgent }) {
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-start justify-between gap-3">
           <ChatAgentAvatar name={displayName} avatarUrl={agent.avatarUrl} size="lg" />
-          <ChatAgentStatusBadge status={agent.status} />
+          <span className="mr-8">
+            <ChatAgentStatusBadge status={agent.status} />
+          </span>
         </div>
 
         <div className="mt-3 flex items-start gap-2">
@@ -94,6 +98,9 @@ export function ChatAgentCard({ agent }: { agent: ChatAgent }) {
         <MetaCell label="Updated" value={getRelativeTime(agent.updatedAt) || "—"} />
       </dl>
     </Link>
+    {/* Outside the link, so opening the menu doesn't open the chatbot. */}
+    <ChatAgentActionsMenu agent={agent} className="absolute top-3 right-2 size-8 text-muted-foreground" />
+    </div>
   );
 }
 

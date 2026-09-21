@@ -4,7 +4,7 @@ import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { AuthService } from './auth.service';
-import { LoginDto, RefreshDto } from './dto/auth.dto';
+import { GuestDto, LoginDto, RefreshDto } from './dto/auth.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -26,9 +26,9 @@ export class AuthController {
   @HttpCode(200)
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
-  @ApiOperation({ summary: 'One-click sign-in as a guest tester (no credentials)' })
-  guest() {
-    return this.auth.guest();
+  @ApiOperation({ summary: 'Tester sign-in with just a name (no password)' })
+  guest(@Body() dto: GuestDto) {
+    return this.auth.guest(dto.name);
   }
 
   @Public()

@@ -3,13 +3,19 @@
  * widget-feedback.dto.ts — the server refuses anything outside this list.
  */
 export const FEEDBACK_REASONS = {
-  up: ["accurate", "helpful", "clear", "friendly", "fast"],
-  down: ["incorrect", "unclear", "off_topic", "too_long", "unhelpful", "tone"],
+  up: ["convincing", "natural_ask", "good_offer", "accurate", "helpful", "clear", "friendly", "fast"],
+  down: ["pushy", "too_early", "scripted", "incorrect", "unclear", "off_topic", "too_long", "unhelpful", "tone"],
 } as const;
 
 export type FeedbackReason = (typeof FEEDBACK_REASONS)["up"][number] | (typeof FEEDBACK_REASONS)["down"][number];
 
 const LABELS: Record<string, string> = {
+  convincing: "Convinced me to share my number",
+  natural_ask: "Asked for details naturally",
+  good_offer: "Good offer / reason to share",
+  pushy: "Too pushy",
+  too_early: "Asked too early",
+  scripted: "Sounds scripted / robotic",
   accurate: "Accurate",
   helpful: "Helpful",
   clear: "Clear",

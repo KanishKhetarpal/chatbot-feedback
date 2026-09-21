@@ -29,6 +29,7 @@ interface VisitorForStep {
   fieldSources: unknown;
   timezone: string | null;
   name: string | null;
+  phone?: string | null;
 }
 
 interface AgentForStep {
@@ -56,7 +57,12 @@ export class GuidedFlowRuntimeService {
   }): Promise<StepResult> {
     const { agent, visitor, nodeId } = input;
 
-    if (nodeId === 'escape_ai') return this.handleEscapeAi(visitor);
+    if (nodeId === 'escape_ai') {
+      if (this.parseFlow(agent)?.noAi) {
+        throw new BadRequestException({ error: 'unknown_node', message: 'This chatbot answers from its menu only.' });
+      }
+      return this.handleEscapeAi(visitor);
+    }
     if (nodeId === 'escape_human') return this.handleEscapeHuman(agent, visitor);
 
     const flow = this.parseFlow(agent);
@@ -79,7 +85,36 @@ export class GuidedFlowRuntimeService {
       });
     }
 
-    const answer = interpolate(node.answer, this.buildFacts(visitor));
+    let answer = interpolate(pickVariant(node.answer), this.buildFacts(visitor));
+
+    // Rule-based lead capture: every so often, while no number has been left,
+    // the answer carries the lead form (with a "not now" way to keep going).
+    const custom = { ...(((visitor.custom ?? {}) as Record<string, unknown>) || {}) };
+    const answered = (Number(custom.guidedAnswers) || 0) + 1;
+    custom.guidedAnswers = answered;
+    const capture = flow.capture;
+    const gated = Boolean(capture?.gateAfter && capture.gatePrompt && !visitor.phone && answered >= capture.gateAfter);
+    if (gated) {
+      answer = `${answer}\n\n${interpolate(capture!.gatePrompt!, this.buildFacts(visitor))}`;
+    } else if (capture && !visitor.phone) {
+      const shown = Number(custom.captureShown) || 0;
+      if (typeof custom.captureAt !== 'number') {
+        const lo = Math.min(capture.afterMin, capture.afterMax);
+        const hi = Math.max(capture.afterMin, capture.afterMax);
+        custom.captureAt = lo + Math.floor(Math.random() * (hi - lo + 1));
+      }
+      if (answered >= (custom.captureAt as number) && shown < capture.maxTimes) {
+        if (/<ui>/.test(answer)) {
+          // This answer already asks for something; try again on the next one.
+          custom.captureAt = answered + 1;
+        } else {
+          const prompt = capture.prompts[shown % capture.prompts.length];
+          answer = `${answer}\n\n${interpolate(prompt, this.buildFacts(visitor))}`;
+          custom.captureShown = shown + 1;
+          custom.captureAt = answered + capture.repeatEvery;
+        }
+      }
+    }
 
     await this.prisma.$transaction([
       this.prisma.chatWidgetMessage.create({
@@ -90,21 +125,29 @@ export class GuidedFlowRuntimeService {
       }),
       this.prisma.chatWidgetVisitor.update({
         where: { id: visitor.id },
-        data: { currentNodeId: node.id, lastSeenAt: new Date(), messageCount: { increment: 2 } },
+        data: {
+          currentNodeId: node.id,
+          lastSeenAt: new Date(),
+          messageCount: { increment: 2 },
+          custom: custom as unknown as object,
+        },
       }),
     ]);
 
+    // A node with nowhere to go hands back the topic menu, so nobody is stuck.
+    const next = this.materialiseNext(flow, node);
     return {
       mode: 'guided',
       answer,
-      next: this.materialiseNext(flow, node),
+      // Details are compulsory from here: the form is the only way forward.
+      next: gated ? [] : next.length ? next : this.rootChips(flow),
       currentNodeId: node.id,
       callbackTaskCreated: false,
     };
   }
 
   private async handleEscapeAi(visitor: VisitorForStep): Promise<StepResult> {
-    const marker = '_Switched to free-text mode — ask me anything._';
+    const marker = 'Sure. Type your question below and I will answer it.';
     await this.prisma.$transaction([
       this.prisma.chatWidgetMessage.create({
         data: { visitorId: visitor.id, role: 'assistant', content: marker, chipNodeId: 'escape_ai' },
@@ -234,6 +277,15 @@ export class GuidedFlowRuntimeService {
     const firstName = visitor.name ? visitor.name.trim().split(/\s+/)[0] : undefined;
     return { ...(firstName ? { firstName, name: visitor.name } : {}), ...custom };
   }
+}
+
+/**
+ * An answer may hold several wordings separated by a line containing only
+ * `~~~`; one is picked at random so repeat visitors do not see a script.
+ */
+export function pickVariant(answer: string): string {
+  const variants = answer.split(/\n\s*~~~\s*\n/).map((v) => v.trim()).filter(Boolean);
+  return variants.length ? variants[Math.floor(Math.random() * variants.length)] : answer;
 }
 
 /**

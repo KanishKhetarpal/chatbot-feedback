@@ -11,8 +11,10 @@
  * `widget-chat.tsx` holds all of the state; this file holds none.
  */
 
+import { iconFor } from "@/lib/widget-icons";
 import { useState, type CSSProperties, type ReactNode } from "react";
 import {
+  RotateCcw,
   ArrowUp,
   ArrowUpRight,
   ChevronLeft,
@@ -92,15 +94,33 @@ export function WidgetText({ text }: { text: string }) {
   return (
     <>
       {lines.map((line, index) => {
-        const bullet = /^\s*[-*]\s+(.*)$/.exec(line);
+        const bullet = /^\s*[-*•]\s+(.*)$/.exec(line);
+        // "[shield] 24/7 security" — an icon tag at the start of a bullet or line.
+        const tagged = /^\s*(?:[-*•]\s+)?\[([a-z]+)\]\s*(.*)$/i.exec(line);
+        const TagIcon = tagged ? iconFor(tagged[1]) : null;
+        if (tagged && TagIcon) {
+          return (
+            <span key={index} className="my-0.5 flex items-start gap-2">
+              <span
+                className="mt-[1px] grid size-[22px] shrink-0 place-items-center rounded-md"
+                style={{ background: "color-mix(in srgb, var(--widget-primary) 12%, transparent)", color: "var(--widget-primary)" }}
+                aria-hidden
+              >
+                <TagIcon className="size-3.5" strokeWidth={2.2} />
+              </span>
+              <span className="min-w-0 pt-[1px]">{renderInline(tagged[2])}</span>
+            </span>
+          );
+        }
         if (bullet) {
+          const body = bullet[1].replace(/^\[[a-z]+\]\s*/i, "");
           return (
             <span key={index} className="flex gap-2 pl-0.5">
               <span
                 className="mt-[0.55em] size-1.5 shrink-0 rounded-full bg-current opacity-60"
                 aria-hidden
               />
-              <span>{renderInline(bullet[1])}</span>
+              <span>{renderInline(body)}</span>
             </span>
           );
         }
@@ -261,6 +281,7 @@ export function WidgetHeader({
   title,
   subtitle,
   onBack,
+  onReset,
 }: {
   theme: WidgetTheme;
   name: string;
@@ -269,6 +290,8 @@ export function WidgetHeader({
   /** One short status line under the name, e.g. "Counsellor requested". Omit for none. */
   subtitle?: string;
   onBack?: () => void;
+  /** Start a fresh conversation with this bot. */
+  onReset?: () => void;
 }) {
   const initial = (name?.charAt(0) || "A").toUpperCase();
   const light = isLightHex(theme.background);
@@ -285,7 +308,7 @@ export function WidgetHeader({
         color: theme.backgroundText,
       }}
     >
-      <div className="w-10 shrink-0">
+      <div className={`shrink-0 ${onReset ? "w-[92px]" : "w-10"}`}>
         {onBack ? (
           <button
             type="button"
@@ -332,7 +355,22 @@ export function WidgetHeader({
           </p>
         ) : null}
       </div>
-      <div className="w-10 shrink-0" aria-hidden />
+      <div className={`flex shrink-0 justify-end ${onReset ? "w-[92px]" : "w-10"}`}>
+        {onReset ? (
+          <button
+            type="button"
+            onClick={onReset}
+            aria-label="Start a new chat"
+            title="Start this chat again from fresh"
+            data-widget-hover
+            className="flex h-8 items-center gap-1 rounded-full px-2.5 text-[11.5px] font-medium"
+            style={{ color: theme.mutedText, boxShadow: `inset 0 0 0 1px ${theme.border}` }}
+          >
+            <RotateCcw className="size-3.5" strokeWidth={2.2} />
+            New chat
+          </button>
+        ) : null}
+      </div>
     </header>
   );
 }

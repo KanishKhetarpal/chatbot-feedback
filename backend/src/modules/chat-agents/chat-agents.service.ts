@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { previewText } from './ui-block.util';
 import { isAllowedModel } from './chat-agent-models';
 import { ChatAgentValidationError, emptyToNull, normalizeOrigins } from './chat-agent.util';
 import { CreateChatAgentDto } from './dto/create-chat-agent.dto';
@@ -114,7 +115,7 @@ export class ChatAgentsService {
               messageCount: t.messageCount,
               rating: t.rating,
               lastMessage: last
-                ? { role: last.role as 'user' | 'assistant', preview: last.content.slice(0, 140), at: last.createdAt }
+                ? { role: last.role as 'user' | 'assistant', preview: previewText(last.content, 140), at: last.createdAt }
                 : null,
             }
           : null,

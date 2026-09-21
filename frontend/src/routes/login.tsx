@@ -26,6 +26,7 @@ function LoginPage() {
   const navigate = useNavigate();
   const setUser = useUserStore((s) => s.setUser);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [testerName, setTesterName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
@@ -36,9 +37,9 @@ function LoginPage() {
   }
 
   const guest = useMutation({
-    mutationFn: async () => (await Axios.post<LoginResponse>("/api/v1/auth/guest")).data,
+    mutationFn: async () => (await Axios.post<LoginResponse>("/api/v1/auth/guest", { name: testerName.trim() })).data,
     onSuccess: (data) => {
-      toast.success("You're in — pick a chatbot to start");
+      toast.success(`Hi ${data.user.name.split(" ")[0]}, pick a chatbot to start`);
       finish(data);
     },
     onError: (err) => toast.error(getErrorMessage(err, "Could not sign in")),
@@ -86,15 +87,39 @@ function LoginPage() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">Welcome</p>
             <h2 className="mt-2 font-display text-3xl font-bold tracking-tight">Start testing</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              No account needed. One click and you can talk to every live chatbot.
+              Just your name, no password. It goes on your feedback so the team knows who said what.
             </p>
           </div>
 
-          <Button type="button" className="h-12 w-full text-base" disabled={guest.isPending} onClick={() => guest.mutate()}>
-            <UserRound className="size-4" />
-            {guest.isPending ? "Signing in…" : "Sign in"}
-            <ArrowRight className="size-4" />
-          </Button>
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (testerName.trim().length < 2) return toast.error("Please enter your name");
+              if (!guest.isPending) guest.mutate();
+            }}
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="tester-name">Your name</Label>
+              <div className="relative">
+                <UserRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="tester-name"
+                  autoComplete="name"
+                  autoFocus
+                  maxLength={60}
+                  className="h-11 pl-9"
+                  value={testerName}
+                  onChange={(e) => setTesterName(e.target.value)}
+                  placeholder="e.g. Priya Sharma"
+                />
+              </div>
+            </div>
+            <Button type="submit" className="h-12 w-full text-base" disabled={guest.isPending}>
+              {guest.isPending ? "Signing in…" : "Start testing"}
+              <ArrowRight className="size-4" />
+            </Button>
+          </form>
 
           <div className="relative py-1">
             <div className="absolute inset-0 flex items-center">

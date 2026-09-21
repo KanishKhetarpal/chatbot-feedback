@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { AlertTriangle, Loader2, MoreVertical, Trash2 } from "lucide-react";
+import { AlertTriangle, Loader2, MoreVertical, Pause, Play, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
-import { useDeleteChatAgent } from "@/components/chat-agents/hook/mutation/use-chat-agent-mutations";
+import { useDeleteChatAgent, useUpdateChatAgent } from "@/components/chat-agents/hook/mutation/use-chat-agent-mutations";
+import { getErrorMessage } from "@/lib/axios-config";
 import { SectionHeading } from "@/components/chat-agents/profile-sections";
 import { Button } from "@/components/ui/button";
 import {
@@ -62,10 +64,11 @@ export function DeleteChatAgentDialog({
 }) {
   const navigate = useNavigate();
   const deleteAgent = useDeleteChatAgent();
+  const pauseAgent = useUpdateChatAgent(agent.id);
   const [confirmText, setConfirmText] = useState("");
 
   const name = agent.name || "Untitled chatbot";
-  const isDeleting = deleteAgent.isPending;
+  const isDeleting = deleteAgent.isPending || pauseAgent.isPending;
   const confirmMatches = confirmText.trim() === name;
   const sourceCount = agent.knowledgeSources?.length ?? 0;
 
@@ -77,10 +80,22 @@ export function DeleteChatAgentDialog({
     if (!nextOpen) setConfirmText("");
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!confirmMatches) return;
+    // The server only deletes a paused chatbot, so a live one is paused first.
+    if (agent.status === "active") {
+      try {
+        await pauseAgent.mutateAsync({ status: "paused" });
+      } catch (error) {
+        toast.error(getErrorMessage(error, "Could not pause this chatbot"));
+        return;
+      }
+    }
     deleteAgent.mutate(agent.id, {
-      onSuccess: () => void navigate({ to: "/" }),
+      onSuccess: () => {
+        onOpenChange(false);
+        void navigate({ to: "/" });
+      },
     });
   }
 
@@ -158,9 +173,20 @@ export function DeleteChatAgentDialog({
  * it. Hiding it instead would read as "this chatbot cannot be deleted", which is
  * not true and leaves the author with nowhere to go.
  */
-export function ChatAgentActionsMenu({ agent }: { agent: ChatAgent }) {
+export function ChatAgentActionsMenu({ agent, className }: { agent: ChatAgent; className?: string }) {
   const [open, setOpen] = useState(false);
+  const update = useUpdateChatAgent(agent.id);
   const isLive = agent.status === "active";
+
+  function setStatus(status: "active" | "paused") {
+    update.mutate(
+      { status },
+      {
+        onSuccess: () => toast.success(status === "active" ? `"${agent.name}" is live` : `"${agent.name}" is paused`),
+        onError: (error) => toast.error(getErrorMessage(error, "Could not change the status")),
+      },
+    );
+  }
 
   return (
     <>
@@ -170,25 +196,28 @@ export function ChatAgentActionsMenu({ agent }: { agent: ChatAgent }) {
             variant="ghost"
             size="icon"
             aria-label="Chatbot actions"
-            className="size-8 text-muted-foreground"
+            className={className ?? "size-8 text-muted-foreground"}
+            disabled={update.isPending}
           >
             <MoreVertical className="size-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64">
-          <DropdownMenuItem
-            disabled={isLive}
-            onSelect={() => setOpen(true)}
-            className="text-destructive focus:text-destructive"
-          >
-            <Trash2 className="mr-2 size-4" />
-            Delete chatbot
-          </DropdownMenuItem>
+        <DropdownMenuContent align="end" className="w-48">
           {isLive ? (
-            <p className="px-2 pt-1 pb-1.5 text-[11px] leading-relaxed text-muted-foreground">
-              Pause this chatbot on the Deploy tab before deleting it.
-            </p>
-          ) : null}
+            <DropdownMenuItem onSelect={() => setStatus("paused")}>
+              <Pause className="mr-2 size-4" />
+              Pause
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem onSelect={() => setStatus("active")}>
+              <Play className="mr-2 size-4" />
+              Activate
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem onSelect={() => setOpen(true)} className="text-destructive focus:text-destructive">
+            <Trash2 className="mr-2 size-4" />
+            Delete
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 

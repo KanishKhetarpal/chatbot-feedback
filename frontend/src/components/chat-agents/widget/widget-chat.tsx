@@ -14,6 +14,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { describeUi, isBlocking, isGate, splitReply } from "@/lib/widget-ui";
+import { WidgetMedia, WidgetNext, WidgetPlanBar, WidgetUiBlock } from "./widget-ui-blocks";
+
 import {
   LeadCaptureCard,
   TypingDots,
@@ -45,6 +48,8 @@ import { MessageActions } from "@/components/chat-agents/widget/widget-message-a
 import { DEFAULT_WIDGET_THEME, guidedChipsFor } from "@/lib/chat-agent-constants";
 import {
   fetchWidgetConfig,
+  forgetWidgetConversation,
+  WIDGET_RESET_EVENT,
   hasCaptured,
   loadLocalHistory,
   markCaptured,
@@ -52,6 +57,7 @@ import {
   rateWidgetConversation,
   rateWidgetMessage,
   readVisitorToken,
+  requestWidgetNudge,
   saveLocalHistory,
   sendWidgetMessage,
   stepWidgetFlow,
@@ -93,6 +99,9 @@ function usePrefersReducedMotion() {
   return reduced;
 }
 
+/** How long a visitor may be quiet after a bot reply before the bot follows up. */
+const NUDGE_AFTER_MS = 45_000;
+
 function uid() {
   return typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Math.random());
 }
@@ -119,10 +128,16 @@ function fromServer(messages: WidgetServerMessage[]): ChatMessage[] {
 
 function resumeFlow(flow: GuidedFlow | null, visitor: WidgetVisitorState | null): { mode: WidgetFlowMode; chips: WidgetChip[] } {
   if (!flow) return { mode: "ai", chips: [] };
+  if (flow.noAi) {
+    // Rule-based: always the menu, never free text.
+    const current = visitor?.currentNodeId ? flow.nodes[visitor.currentNodeId] : null;
+    const next = current?.next.length ? current.next : flow.rootIds;
+    return { mode: "guided", chips: guidedChipsFor(flow, next.filter((id) => id !== "escape_ai")) };
+  }
   if (visitor?.handoffAt) return { mode: "handoff", chips: [] };
   if (visitor?.guidedFlowExitedAt) return { mode: "ai", chips: [] };
   const current = visitor?.currentNodeId ? flow.nodes[visitor.currentNodeId] : null;
-  if (current) return { mode: "guided", chips: guidedChipsFor(flow, current.next) };
+  if (current?.next.length) return { mode: "guided", chips: guidedChipsFor(flow, current.next) };
   return { mode: "guided", chips: guidedChipsFor(flow, flow.rootIds) };
 }
 
@@ -158,6 +173,10 @@ export function WidgetChat({
 
   // Conversation-level feedback.
   const [ratingOpen, setRatingOpen] = useState(false);
+  /** Bumped by "start a new chat" to re-run boot from scratch. */
+  const [bootNonce, setBootNonce] = useState(0);
+  /** The visitor chose to type while a template question is on screen. */
+  const [typeInstead, setTypeInstead] = useState(false);
   const [conversationRating, setConversationRating] = useState<number | null>(null);
   const [conversationComment, setConversationComment] = useState<string | null>(null);
 
@@ -179,6 +198,38 @@ export function WidgetChat({
     if (booting || streaming) return;
     saveLocalHistory(agentKey, messages);
   }, [agentKey, messages, streaming, booting]);
+
+  // A new message on screen closes any "type instead" the visitor opened.
+  useEffect(() => {
+    setTypeInstead(false);
+  }, [messages.length]);
+
+  // Follow-up system: if the visitor goes quiet after a bot reply, the bot
+  // follows up once (the server caps it per silence and per conversation).
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (booting || streaming || tab !== "messages" || draft.trim()) return;
+    // Rule-based bots never call the AI, and guided chips are not an AI turn.
+    if (guidedFlow?.noAi || flowMode === "guided") return;
+    if (!last || last.from !== "bot" || !last.serverId || last.failed) return;
+    if (isBlocking(splitReply(last.text).ui)) return;
+    const timer = window.setTimeout(async () => {
+      const token = tokenRef.current;
+      if (!token) return;
+      try {
+        const nudge = await requestWidgetNudge({ token });
+        if (!nudge) return;
+        setMessages((m) => [
+          ...m,
+          { id: uid(), serverId: nudge.assistantMessageId ?? undefined, from: "bot", text: nudge.reply },
+        ]);
+        onActivity?.();
+      } catch {
+        // A missed follow-up is not worth an error on screen.
+      }
+    }, NUDGE_AFTER_MS);
+    return () => window.clearTimeout(timer);
+  }, [messages, booting, streaming, tab, draft, onActivity, guidedFlow, flowMode]);
 
   const ensureSession = useCallback(async () => {
     const stored = readVisitorToken(agentKey);
@@ -217,6 +268,12 @@ export function WidgetChat({
         if (stored) {
           const session = await ensureSession();
           if (cancelled) return;
+          // The server would not resume that thread (another person's, or gone):
+          // drop this browser's copy of it too, so the chat starts fresh.
+          if (!session.visitorToken) {
+            forgetWidgetConversation(agentKey);
+            setCaptureDone(false);
+          }
           scheduleRefresh(session.expiresIn);
           presentation = session.agent;
           flow = session.guidedFlow;
@@ -243,7 +300,10 @@ export function WidgetChat({
         setChips(resumed.chips);
 
         const firstName = (visitor?.leadDigest?.firstName ?? visitor?.name)?.trim();
-        const greeting = [firstName ? `Welcome back, ${firstName}!` : "", presentation.greeting?.trim() ?? ""]
+        // A greeting may hold several wordings split by a "~~~" line: one is picked at random.
+        const greetings = (presentation.greeting ?? "").split(/\n\s*~~~\s*\n/).map((g) => g.trim()).filter(Boolean);
+        const pickedGreeting = greetings.length ? greetings[Math.floor(Math.random() * greetings.length)] : "";
+        const greeting = [firstName ? `Welcome back, ${firstName}!` : "", pickedGreeting]
           .filter(Boolean)
           .join(" ");
 
@@ -273,7 +333,7 @@ export function WidgetChat({
       if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
       abortRef.current?.abort();
     };
-  }, [agentKey, ensureSession, scheduleRefresh]);
+  }, [agentKey, ensureSession, scheduleRefresh, bootNonce]);
 
   async function refreshTokenIfNeeded(): Promise<string | null> {
     if (tokenRef.current && Date.now() < tokenExpiresAtRef.current - 30_000) return tokenRef.current;
@@ -339,6 +399,10 @@ export function WidgetChat({
         }
       }
       if (!sawTerminal) failBubble("Connection dropped before the reply finished. Please try again.");
+      else if (sent.followup) {
+        const { id, content } = sent.followup;
+        setMessages((m) => [...m, { id: uid(), serverId: id, from: "bot", text: content }]);
+      }
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       failBubble(err instanceof WidgetApiError ? err.message : "Something went wrong sending your message.");
@@ -394,8 +458,13 @@ export function WidgetChat({
       if (result.answer.trim()) setBubble(botId, { text: result.answer });
       else setMessages((m) => m.filter((msg) => msg.id !== botId));
 
-      setFlowMode(result.mode);
-      setChips(result.mode === "guided" ? result.next : []);
+      if (guidedFlow.noAi && result.mode !== "guided") {
+        setFlowMode("guided");
+        setChips(guidedChipsFor(guidedFlow, guidedFlow.rootIds));
+      } else {
+        setFlowMode(result.mode);
+        setChips(result.mode === "guided" ? result.next : []);
+      }
     } catch (err) {
       if (err instanceof WidgetApiError && err.code === "rate_limited") {
         setMessages((m) => m.filter((msg) => msg.id !== botId));
@@ -418,6 +487,60 @@ export function WidgetChat({
       onActivity?.();
     }
   }
+
+  /** A name + number typed into an interactive form or a locked guide. */
+  async function submitInlineLead(name: string, phone: string, email?: string) {
+    const result = await submitWidgetLead({ token: tokenRef.current, agentKey, name, phone, email, history: messages });
+    adoptToken(result.visitorToken);
+    markCaptured(agentKey);
+    setCaptureDone(true);
+  }
+
+  /**
+   * A rule-based bot's form was submitted: the lead is already saved; show the
+   * visitor's details and the scripted confirmation, then bring the menu back.
+   * No AI call.
+   */
+  function finishLocalForm(visitorText: string, botText: string) {
+    setMessages((m) => [...m, { id: uid(), from: "user", text: visitorText }, { id: uid(), from: "bot", text: botText }]);
+    setCaptureThanks(false);
+    if (guidedFlow) {
+      setFlowMode("guided");
+      setChips(guidedChipsFor(guidedFlow, guidedFlow.rootIds));
+    }
+    onActivity?.();
+  }
+
+  /** Start over: forget this browser's thread with the bot and boot fresh. */
+  function resetConversation() {
+    if (streaming) return;
+    abortRef.current?.abort();
+    forgetWidgetConversation(agentKey);
+    tokenRef.current = null;
+    tokenExpiresAtRef.current = 0;
+    setMessages([]);
+    setDraft("");
+    setComposerError(null);
+    setCaptureDone(false);
+    setCaptureThanks(false);
+    setConversationRating(null);
+    setConversationComment(null);
+    setRatingOpen(false);
+    setTypeInstead(false);
+    setBootNonce((n) => n + 1);
+    onActivity?.();
+  }
+
+  // "New chat" from outside the widget (the Chats sidebar).
+  const resetRef = useRef(resetConversation);
+  resetRef.current = resetConversation;
+  useEffect(() => {
+    const onReset = (e: Event) => {
+      if ((e as CustomEvent<string>).detail === agentKey) resetRef.current();
+    };
+    window.addEventListener(WIDGET_RESET_EVENT, onReset);
+    return () => window.removeEventListener(WIDGET_RESET_EVENT, onReset);
+  }, [agentKey]);
 
   function showMenu() {
     if (!guidedFlow) return;
@@ -503,7 +626,23 @@ export function WidgetChat({
   // reachable from the pill next to the composer.
   const canRate = Boolean(tokenRef.current) && answeredOnce;
 
+  const lastMessage = messages[messages.length - 1];
+  const latestUi = lastMessage?.from === "bot" && !lastMessage.failed ? splitReply(lastMessage.text).ui : null;
+  const latestBlocking = !streaming && isBlocking(latestUi);
+  const latestGate = !streaming && isGate(latestUi);
+  // Every bot message since the visitor last spoke is "current": a quiz step
+  // stays answerable when a details form arrives right after it.
+  const lastUserIndex = messages.reduce((acc, m, i) => (m.from === "user" ? i : acc), -1);
+  // The newest plan any bot reply pinned; it lives under the header, not in the thread.
+  let pinnedPlan: ReturnType<typeof splitReply>["plan"] = null;
+  for (let i = messages.length - 1; i >= 0 && !pinnedPlan; i--) {
+    if (messages[i].from === "bot") pinnedPlan = splitReply(messages[i].text).plan;
+  }
+
   const presets = hasFlow ? [] : (agent.messagePresets ?? []).slice(0, 4);
+  // A greeting that carries its own element or suggestions replaces the preset list.
+  const greetingParts = messages[0]?.id === "greeting" ? splitReply(messages[0].text) : null;
+  const greetingHasOptions = Boolean(greetingParts && (greetingParts.ui || greetingParts.next.length));
   const placeholder = agent.inputPlaceholder?.trim() || "Ask a question…";
   const homeHeading = agent.heading?.trim() || "Hey there";
   const homeSubheading = agent.subheading?.trim() || `Got questions? Let's chat with ${agent.name}.`;
@@ -530,22 +669,34 @@ export function WidgetChat({
         </>
       ) : (
         <>
-          <WidgetHeader
-            theme={theme}
-            name={agent.name}
-            avatarUrl={agent.avatarUrl}
-            title={agent.name || "Assistant"}
-            subtitle={handedOff ? "Handoff requested" : conversationRating ? `You rated this chat ${conversationRating}/5` : undefined}
-            onBack={startOnMessages ? undefined : () => setTab("home")}
-          />
+          {/* The frosted header normally floats over the thread; above a pinned plan it needs its own backing. */}
+          <div className="shrink-0" style={pinnedPlan ? { background: theme.background } : { display: "contents" }}>
+            <WidgetHeader
+              theme={theme}
+              name={agent.name}
+              avatarUrl={agent.avatarUrl}
+              title={agent.name || "Assistant"}
+              subtitle={handedOff ? "Handoff requested" : conversationRating ? `You rated this chat ${conversationRating}/5` : undefined}
+              onBack={startOnMessages ? undefined : () => setTab("home")}
+              onReset={resetConversation}
+            />
+            {pinnedPlan ? <WidgetPlanBar theme={theme} plan={pinnedPlan} /> : null}
+          </div>
 
-          <WidgetMessages theme={theme} underHeader>
+          {/* A pinned plan sits between the header and the thread, so the thread cannot slide under the header. */}
+          <WidgetMessages theme={theme} underHeader={!pinnedPlan}>
             <WidgetDayDivider theme={theme} />
             {messages.map((m, i) => {
-              const isRateable = m.from === "bot" && Boolean(m.serverId) && !m.failed && m.text.trim();
+              // A bot reply may carry photos, an element and follow-ups after its text.
+              const { text: shownText, ui, media, next, then } =
+                m.from === "bot" ? splitReply(m.text) : { text: m.text, ui: null, media: [], next: [] as string[], then: "" };
+              const isRateable = m.from === "bot" && Boolean(m.serverId) && !m.failed && Boolean(shownText.trim() || ui);
+              const isLatest = i === messages.length - 1;
+              // A reply that is only an element needs no empty bubble above it.
+              const elementOnly = m.from === "bot" && Boolean(ui) && !shownText.trim() && Boolean(m.text);
               return (
                 <div key={m.id} className="group/msg">
-                  <WidgetBubble
+                  {elementOnly ? null : <WidgetBubble
                     theme={theme}
                     from={m.from}
                     failed={m.failed}
@@ -554,7 +705,7 @@ export function WidgetChat({
                   >
                     {m.text ? (
                       m.from === "bot" ? (
-                        <WidgetText text={m.text} />
+                        <WidgetText text={shownText} />
                       ) : (
                         m.text
                       )
@@ -563,11 +714,36 @@ export function WidgetChat({
                     ) : (
                       ""
                     )}
-                  </WidgetBubble>
+                  </WidgetBubble>}
+                  {media.length && !m.failed ? <WidgetMedia theme={theme} media={media} /> : null}
+                  {ui && !m.failed ? (
+                    <WidgetUiBlock
+                      theme={theme}
+                      block={ui}
+                      active={!streaming && (isLatest || (i > lastUserIndex && !latestGate))}
+                      disabled={streaming}
+                      onSend={(text) => send(text)}
+                      onLead={submitInlineLead}
+                      onLocal={finishLocalForm}
+                      onTypeOwn={guided ? undefined : () => setTypeInstead(true)}
+                      onSkipLocal={() => setTypeInstead(true)}
+                    />
+                  ) : null}
+                  {then && !m.failed ? (
+                    <div className="mt-2">
+                      <WidgetBubble theme={theme} from="bot" animate={animate} group={{ first: false, last: true }}>
+                        <WidgetText text={then} />
+                      </WidgetBubble>
+                    </div>
+                  ) : null}
+                  {/* Follow-ups stay available next to a form, so a counsellor form is never a dead end. */}
+                  {isLatest && !streaming && !m.failed && next.length && (!isBlocking(ui) || (ui?.type === "form" && !ui.gate)) ? (
+                    <WidgetNext theme={theme} options={next} disabled={streaming} onSend={(text) => send(text)} />
+                  ) : null}
                   {isRateable ? (
                     <MessageActions
                       theme={theme}
-                      text={m.text}
+                      text={shownText.trim() || (ui ? describeUi(ui) : "")}
                       rating={m.rating ?? null}
                       reason={m.feedbackReason ?? null}
                       note={m.feedbackNote ?? null}
@@ -579,9 +755,10 @@ export function WidgetChat({
               );
             })}
 
-            {!streaming ? chipRow : null}
+            {/* A compulsory details form is the only way forward: no menu beside it. */}
+            {!streaming && !latestGate ? chipRow : null}
 
-            {!askedOnce && presets.length > 0 ? (
+            {!askedOnce && presets.length > 0 && !greetingHasOptions ? (
               <WidgetPresets theme={theme} presets={presets} disabled={streaming} onSelect={(preset) => void send(preset)} />
             ) : null}
 
@@ -635,7 +812,22 @@ export function WidgetChat({
             />
           ) : handedOff ? (
             <WidgetHandoffNotice theme={theme} text={HANDOFF_COPY} />
-          ) : guided ? null : (
+          ) : guided || guidedFlow?.noAi ? null : latestGate ? (
+            <div className="shrink-0 px-3 pt-2 pb-3 text-center text-[11.5px]" style={{ borderTop: `1px solid ${theme.border}`, background: theme.background, color: theme.mutedText }}>
+              Fill in your details above to continue.
+            </div>
+          ) : latestBlocking && !typeInstead ? (
+            <div className="shrink-0 px-3 pt-1 pb-2.5 text-center" style={{ borderTop: `1px solid ${theme.border}`, background: theme.background }}>
+              <button
+                type="button"
+                onClick={() => setTypeInstead(true)}
+                className="text-[11.5px] font-medium underline-offset-2 hover:underline"
+                style={{ color: theme.mutedText }}
+              >
+                Pick an option above, or type your own answer
+              </button>
+            </div>
+          ) : (
             <WidgetComposer
               theme={theme}
               value={draft}

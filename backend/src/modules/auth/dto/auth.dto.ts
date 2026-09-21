@@ -15,6 +15,14 @@ export class LoginDto {
   password: string;
 }
 
+export class GuestDto {
+  @ApiProperty({ example: 'Priya', description: "The tester's name, shown on their conversations and feedback." })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(60)
+  name: string;
+}
+
 export class RefreshDto {
   @ApiProperty()
   @IsString()

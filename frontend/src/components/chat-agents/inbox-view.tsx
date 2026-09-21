@@ -23,6 +23,7 @@ import {
   Wand2,
   Wifi,
 } from "lucide-react";
+import { describeUi, splitUi, textOnly } from "@/lib/widget-ui";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -220,12 +221,17 @@ export function InboxView({ initialVisitorId }: { initialVisitorId?: string } = 
                         </div>
                         <p className="truncate text-[11px] text-muted-foreground">
                           {item.lastMessage
-                            ? `${item.lastMessage.role === "assistant" ? "Bot: " : ""}${item.lastMessage.preview}`
+                            ? `${item.lastMessage.role === "assistant" ? "Bot: " : ""}${textOnly(item.lastMessage.preview)}`
                             : "Opened the chat, never typed"}
                         </p>
                         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
                           <span className="truncate">{item.agent.name}</span>
                           <span>· {item.messageCount} msg</span>
+                          {item.hasPhone ? (
+                            <Badge tone="success" className="px-1.5 py-0 text-[9px]">
+                              <Phone className="size-2.5" /> Lead
+                            </Badge>
+                          ) : null}
                           {item.rating ? (
                             <span className="inline-flex items-center gap-0.5 text-gold">
                               <Star className="size-2.5 fill-current" /> {item.rating}
@@ -351,7 +357,19 @@ function TranscriptBubble({ message }: { message: InboxMessage }) {
             assistant ? "rounded-bl-sm bg-muted" : "rounded-br-sm bg-primary text-primary-foreground",
           )}
         >
-          {message.content}
+          {(() => {
+            const { text, ui } = splitUi(message.content);
+            return (
+              <>
+                {text}
+                {ui ? (
+                  <span className="mt-1.5 block rounded-md border border-border/70 bg-background/60 px-2 py-1 text-[11px] text-muted-foreground">
+                    ▸ {describeUi(ui)}
+                  </span>
+                ) : null}
+              </>
+            );
+          })()}
           {assistant ? (
             <MessageMeta message={message} />
           ) : (

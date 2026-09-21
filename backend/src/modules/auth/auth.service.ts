@@ -29,16 +29,16 @@ export class AuthService {
   }
 
   /**
-   * One-click sign-in for testers. Creates a fresh user-role account with no
-   * password, so every guest's conversations are attributed to their own row
-   * and reviewers can tell one tester from another.
+   * Sign-in for testers: just a name, no password. Creates a fresh user-role
+   * account under that name, so every tester's conversations and feedback are
+   * attributed to them by name on the review pages.
    */
-  async guest() {
+  async guest(name: string) {
     const tag = randomBytes(3).toString('hex');
     const user = await this.prisma.user.create({
       data: {
         email: `guest-${tag}-${Date.now()}@guest.local`,
-        name: `Guest ${tag}`,
+        name: name.trim().replace(/\s+/g, ' '),
         role: 'user',
         isGuest: true,
         passwordHash: await bcrypt.hash(randomBytes(24).toString('hex'), 4),

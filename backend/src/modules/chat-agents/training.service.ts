@@ -209,11 +209,12 @@ export class TrainingService {
         handoffTriggers: true,
         handoffMessage: true,
         qualificationEnabled: true,
+        guidedFlow: true,
       },
     });
     if (!agent) throw new NotFoundException('Agent not found');
 
-    const sources = await this.prisma.chatAgentKnowledgeSource.findMany({
+    const sources =await this.prisma.chatAgentKnowledgeSource.findMany({
       where: { agentId, ...TRAINABLE },
       // Deterministic order: the pack is a prompt-cache key, and re-ordering the
       // same content would look like new content and force a cache rewrite.
@@ -278,7 +279,9 @@ export class TrainingService {
       `Trained agent ${agentId}: v${pack.version}, ${sources.length} sources, ${tokenCount} tokens`,
     );
 
-    await this.warmCache(agent, content, agentId, userId);
+    // A rule-based bot never calls the model, so there is no cache worth paying to warm.
+    const noAi = Boolean((agent.guidedFlow as { noAi?: unknown } | null)?.noAi);
+    if (!noAi) await this.warmCache(agent, content, agentId, userId);
 
     return {
       pack: {

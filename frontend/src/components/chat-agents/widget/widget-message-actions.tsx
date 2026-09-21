@@ -1,7 +1,8 @@
 /**
- * The "⋯" under every bot reply — the feedback entry point.
+ * The thumbs and the "⋯" under every bot reply — the feedback entry point.
  *
- *   Like / Dislike            one tap, optimistic
+ *   👍 / 👎                   always visible, one tap; opens the reason list
+ *   Like / Dislike            also in the menu, optimistic
  *   Why?                      a short reason list that appears once voted
  *   Add a note                free text
  *   Copy reply
@@ -51,6 +52,7 @@ export function MessageActions({
   onRate: (rating: MessageRating, reason: string | null, note: string | null) => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [draft, setDraft] = useState(note ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +73,13 @@ export function MessageActions({
 
   const vote = (next: MessageRating) =>
     run(() => onRate(next, next && next === rating ? reason : null, note));
+  /** The inline thumbs: vote, then open the menu so a reason is one more tap away. */
+  const quickVote = (next: Exclude<MessageRating, null>) =>
+    run(async () => {
+      const toggledOff = rating === next;
+      await onRate(toggledOff ? null : next, toggledOff ? null : reason, note);
+      if (!toggledOff) setMenuOpen(true);
+    });
   const pickReason = (next: string) => run(() => onRate(rating, next, note));
   const saveNote = () =>
     run(async () => {
@@ -123,10 +132,35 @@ export function MessageActions({
 
   const reasons = rating ? FEEDBACK_REASONS[rating] : [];
 
+  const thumbClass = "grid size-6 place-items-center rounded-full transition-opacity hover:opacity-100 disabled:opacity-30";
+
   return (
     <div className="mt-1 flex flex-col gap-1.5 pl-1">
-      <div className="flex items-center gap-1.5">
-        <Menu.Root modal={false}>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          aria-label={rating === "up" ? "Remove like" : "Like this reply"}
+          title={rating === "up" ? "Liked — tap to remove" : "Like this reply"}
+          disabled={busy || disabled}
+          onClick={() => void quickVote("up")}
+          className={cn(thumbClass, rating === "up" ? "opacity-100" : "opacity-45 group-hover/msg:opacity-90")}
+          style={{ color: rating === "up" ? theme.primary : theme.mutedText }}
+        >
+          <ThumbsUp className="size-3.5" strokeWidth={2.25} style={{ fill: rating === "up" ? theme.primary : "transparent" }} />
+        </button>
+        <button
+          type="button"
+          aria-label={rating === "down" ? "Remove dislike" : "Dislike this reply"}
+          title={rating === "down" ? "Disliked — tap to remove" : "Dislike this reply"}
+          disabled={busy || disabled}
+          onClick={() => void quickVote("down")}
+          className={cn(thumbClass, rating === "down" ? "opacity-100" : "opacity-45 group-hover/msg:opacity-90")}
+          style={{ color: rating === "down" ? theme.backgroundText : theme.mutedText }}
+        >
+          <ThumbsDown className="size-3.5" strokeWidth={2.25} style={{ fill: rating === "down" ? theme.mutedText : "transparent" }} />
+        </button>
+
+        <Menu.Root modal={false} open={menuOpen} onOpenChange={setMenuOpen}>
           <Menu.Trigger asChild>
             <button
               type="button"

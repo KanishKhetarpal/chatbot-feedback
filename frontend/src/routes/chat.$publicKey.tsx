@@ -30,14 +30,19 @@ function ChatPanel() {
         </Link>
         <span className="truncate text-sm font-medium">{agent?.name ?? "Chat"}</span>
       </div>
-      <WidgetChat
-        key={publicKey}
-        agentKey={publicKey}
-        variant="flush"
-        startOnMessages
-        className="h-full min-h-0 flex-1"
-        onActivity={() => void qc.invalidateQueries({ queryKey: [QUERY_KEYS.GET_AVAILABLE_CHAT_AGENTS] })}
-      />
+      {/* Chat-window sized, the way a visitor sees it on the website, not stretched across the pane. */}
+      <div className="flex min-h-0 flex-1 items-stretch justify-center bg-muted/40 md:items-center md:p-6">
+        <div className="h-full w-full md:h-[min(780px,100%)] md:w-[420px]">
+          <WidgetChat
+            key={publicKey}
+            agentKey={publicKey}
+            variant="flush"
+            startOnMessages
+            className="h-full min-h-0 md:rounded-3xl md:shadow-elev-3"
+            onActivity={() => void qc.invalidateQueries({ queryKey: [QUERY_KEYS.GET_AVAILABLE_CHAT_AGENTS] })}
+          />
+        </div>
+      </div>
     </div>
   );
 }

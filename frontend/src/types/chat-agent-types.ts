@@ -187,6 +187,8 @@ export type GuidedFlow = {
   markIntlNoAck?: string;
   /** ≤ 100 entries, keyed by `node.id`. */
   nodes: Record<string, GuidedFlowNode>;
+  /** Purely rule-based: the AI is never called, the visitor never types. */
+  noAi?: boolean;
 };
 
 /** One problem with a tree — from the client validator or the server's 400. */
@@ -440,6 +442,8 @@ export type InboxThread = {
   user: InboxUser | null;
   name: string | null;
   email: string | null;
+  /** True when a mobile number was captured (form or conversation). */
+  hasPhone: boolean;
   deviceType: string | null;
   firstSeenAt: string;
   lastSeenAt: string;
@@ -784,8 +788,26 @@ export type FeedbackItem = {
   conversationStars: number | null;
 };
 
+export type LeadCaptureRow = {
+  agent: FeedbackItem["agent"];
+  /** Conversations in range with at least one visitor message. */
+  conversations: number;
+  withName: number;
+  withPhone: number;
+  /** withPhone ÷ conversations. */
+  captureRate: number | null;
+  /** Visitor messages sent before the one that contained the number, averaged. Null when none captured in chat. */
+  avgTurnsToPhone: number | null;
+  /** Replies liked with a lead-capture reason ("convincing", "natural ask", "good offer"). */
+  convincingLikes: number;
+  /** Replies disliked with a lead-capture reason ("pushy", "too early", "scripted"). */
+  pushyDislikes: number;
+};
+
 export type FeedbackPatterns = {
   range: { from: string; to: string; days: number };
+  /** Which chatbot actually gets the number - the sales test's headline table. */
+  leads: LeadCaptureRow[];
   totals: FeedbackTally & {
     likeRate: number | null;
     replies: number;

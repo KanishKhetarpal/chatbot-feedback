@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, Outlet, useParams } from "@tanstack/react-router";
-import { Bot, Copy, ExternalLink, Search, Star } from "lucide-react";
+import { Bot, Copy, ExternalLink, RotateCcw, Search, Star } from "lucide-react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app-shell";
@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getErrorMessage } from "@/lib/axios-config";
 import { Config } from "@/lib/config";
 import { cn } from "@/lib/utils";
+import { requestNewWidgetChat } from "@/lib/widget-api";
 import { useIsAdmin } from "@/store/use-user-store";
 
 /**
@@ -179,6 +180,17 @@ function ChatLayout() {
                   className="flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
                   <Copy className="size-3.5" /> Copy share link
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    requestNewWidgetChat(activeKey);
+                    toast.success("Started a fresh chat");
+                  }}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+                  title="Start this chatbot's conversation again from fresh. The old one stays in Conversations."
+                >
+                  <RotateCcw className="size-3.5" /> New chat
                 </button>
                 <a
                   href={`/s/${activeKey}`}

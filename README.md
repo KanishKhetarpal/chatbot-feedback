@@ -94,6 +94,39 @@ Model IDs live in [`backend/src/common/ai/claude-models.ts`](backend/src/common/
 
 ---
 
+## 4b. Sales bots
+
+Six admissions bots live as prompt files in [`backend/prisma/sales-bots/bots/`](backend/prisma/sales-bots/bots/): a JSON header (settings, an optional scripted `guidedFlow`, optional `previousNames` for renames) followed by the Instructions body. They share the knowledge base in [`backend/prisma/sales-bots/knowledge/`](backend/prisma/sales-bots/knowledge/). Research behind them: [`docs/sales-bot-playbook.md`](docs/sales-bot-playbook.md).
+
+| Bot | Play |
+|---|---|
+| Meera · Admissions advisor | Consultative seller: diagnose, a personal "why Acharya fits you" card, then an either/or close (callback, video, visit, apply) |
+| Aarav · Course fit & eligibility | Two clickable tools: a 5-tap fit quiz ending in a clean top-3 list, and an eligibility checker; then a named fit report PDF |
+| Nisha · Admissions chat | A normal helpful chat that notes what the visitor cares about, then gifts a guide built from exactly those topics |
+| Rahul · Senior student | Peer voice, "campus in numbers" and "first day" cards; asks the name in a separate, reworded follow-up until he has it |
+| Ananya · Admission planner | "Build my admission plan": six steps in a bar pinned under the header; details asked at the halfway point |
+| Riya · Tap-to-answer (no AI) | Pure if/else tree, never calls the AI; every answer offers related topics; a WhatsApp or call form appears after 2 to 4 taps |
+
+Shared by every AI bot (in `prompt.util.ts`): sounds like a person (one question per reply, no filler, numbers not adjectives, never the same line twice), a sales arc from hook to close, the number asked at most twice and never again after a no or a skipped form, open loops in a separate follow-up bubble, photos only when seeing the place matters, and modules that switch on by topic: scholarship finder, parents mode, video counselling, callback.
+
+Retired bots are listed in `bots/retired.json` (paused, conversations kept); their old files are in `bots/_retired/`.
+
+```bash
+cd backend
+pnpm db:seed:bots            # create / update, train and activate every bot; pause retired ones
+pnpm db:seed:bots -- riya    # only files whose name contains "riya"
+```
+
+**Reply attachments.** A bot reply can carry `<media>` (photo keys from [`media-library.ts`](backend/src/modules/chat-agents/media-library.ts)), one `<ui>` element (chips, select, card, fits, guide = PDF, form), `<then>` (a second bubble), `<plan>` (a checklist pinned under the header) and `<next>` suggestions. [`ui-block.util.ts`](backend/src/modules/chat-agents/ui-block.util.ts) validates them, trims harmless overflows, strips emoji and spaced dashes, and stores them in canonical form; the widget renders them ([`widget-ui-blocks.tsx`](frontend/src/components/chat-agents/widget/widget-ui-blocks.tsx)). Forms can carry `skip` (a "not now" button), `gate` or `local` (rule-based bots: saved without the AI). Choice lists always get "Ask my own question"; multi-selects always get "None of these".
+
+**Lead rules (server-enforced, [`lead-flow.util.ts`](backend/src/modules/chat-agents/lead-flow.util.ts)).** After the bot's 3rd reply a name + number form arrives as its own message, with "Not now" (once). From the 6th reply it is compulsory: the widget hides the input and the server answers nothing else until a number is left. Both wait for the first reply that isn't itself a question (quiz step, dropdown). Forms never ask for what the visitor already gave (a name typed as "I'm Sneha" counts), details forms carry no side suggestions, and a closing question after an answer is split into its own bubble. Riya does the same with `capture.gateAfter`.
+
+**Rule-based bots.** A guided flow with `"noAi": true` never reaches the model: typed messages and idle follow-ups are refused, and training skips the cache warm-up. Answers may hold several wordings separated by a `~~~` line (one is picked at random); a node with no next chips returns the menu; `capture` appends a lead form after a random number of answers while no number has been left. Depth is the shortest number of taps from the menu (max 8).
+
+**Judging them.** The Feedback page opens with a *Lead capture by chatbot* table. Every reply has one-tap thumbs with sales-specific reasons, and conversations that yielded a number carry a **Lead** badge in Conversations. "New chat" (sidebar or chat header) starts a bot's conversation fresh; the old one stays in Conversations.
+
+---
+
 ## 5. Feedback and review
 
 - In the chat, every bot reply gets **👍 / 👎** and an optional **note**; a **Rate this chat** pill opens a 1–5 star card with a comment.
@@ -116,6 +149,21 @@ API: `GET /widget-inbox`, `/stats`, `/export`, `/:visitorId`, `PATCH /:visitorId
 3. Set the variables: paste [`backend/.env.railway.example`](backend/.env.railway.example) into the service's **Variables → Raw Editor**, then fill in `ANTHROPIC_API_KEY` and the two JWT secrets (`openssl rand -hex 32` each).
 4. [`backend/railway.json`](backend/railway.json) already sets the build (`pnpm prisma generate && pnpm build`) and start (`npx prisma migrate deploy && node dist/main`) commands.
 5. After the first deploy, run the seed once from the Railway shell: `pnpm db:seed`.
+6. Load the six sales bots (needs `ANTHROPIC_API_KEY`; safe to re-run after any change to `prisma/sales-bots/`): `pnpm db:seed:bots`. To clear out bots listed in `retired.json` for good: `pnpm db:delete-retired-bots`.
+
+Deploying with the Railway CLI instead of GitHub:
+
+```bash
+npm i -g @railway/cli
+railway login
+cd backend
+railway link                  # pick the project and the backend service
+railway up                    # uploads this folder; railway.json does the build and start
+railway ssh                   # a shell in the running service, then:
+pnpm db:seed && pnpm db:seed:bots
+```
+
+No new environment variables were added for the sales bots; the list in `.env.railway.example` is complete.
 
 ### Frontend → Vercel
 

@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsEmail,
   IsIn,
   IsOptional,
@@ -72,6 +73,16 @@ export class WidgetChatDto {
   @MinLength(16)
   @MaxLength(1024)
   visitorToken?: string;
+
+  /**
+   * True when the widget is re-engaging a visitor who has gone quiet. The
+   * `message` is ignored and nothing is stored on the visitor's side: the bot
+   * sends one short follow-up. Refused unless the last stored turn is the bot's.
+   */
+  @ApiPropertyOptional({ description: 'Follow up with a quiet visitor instead of answering a message.' })
+  @IsOptional()
+  @IsBoolean()
+  nudge?: boolean;
 
   /**
    * The agent to talk to, when there is no token yet.

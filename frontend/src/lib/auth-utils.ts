@@ -28,12 +28,26 @@ const read = (): LoginResponse | null => {
   }
 };
 
+/** Every chatbot thread this browser remembers: a new person signing in starts all bots fresh. */
+const forgetAllWidgetThreads = () => {
+  try {
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith("acharya.widget."))
+      .forEach((k) => localStorage.removeItem(k));
+  } catch {
+    // storage unavailable: nothing to forget
+  }
+};
+
 export const setAuthData = (data: LoginResponse) => {
+  const previous = read()?.user?.id;
+  if (previous !== data.user?.id) forgetAllWidgetThreads();
   localStorage.setItem(LOCAL_STORAGE_KEY.AUTH_TOKEN, JSON.stringify(data));
 };
 
 export const removeAuthData = () => {
   localStorage.removeItem(LOCAL_STORAGE_KEY.AUTH_TOKEN);
+  forgetAllWidgetThreads();
 };
 
 export const updateAuthTokens = (tokens: { accessToken: string; refreshToken?: string }) => {

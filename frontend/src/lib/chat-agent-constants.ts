@@ -18,11 +18,11 @@ import type {
 export const DEFAULT_WIDGET_THEME: WidgetTheme = {
   primary: "#ea580c",
   primaryText: "#fff7ed",
-  background: "#0a0a0a",
-  backgroundText: "#fafafa",
-  muted: "#171717",
-  mutedText: "#a3a3a3",
-  border: "#262626",
+  background: "#ffffff",
+  backgroundText: "#111827",
+  muted: "#f3f4f6",
+  mutedText: "#6b7280",
+  border: "#e5e7eb",
   corners: "rounded",
   launcherPosition: "right",
   launcherSize: 48,
@@ -310,7 +310,7 @@ export const GUIDED_FLOW_LIMITS = {
   maxLabel: 80,
   maxAnswer: 2000,
   maxNext: 6,
-  maxDepth: 5,
+  maxDepth: 8,
 } as const;
 
 export const GUIDED_FLOW_NODE_ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;

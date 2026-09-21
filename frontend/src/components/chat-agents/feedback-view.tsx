@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Bot, ExternalLink, MessageSquareText, Quote, Star, ThumbsDown, ThumbsUp, User } from "lucide-react";
+import { Bot, ExternalLink, MessageSquareText, Phone, Quote, Star, ThumbsDown, ThumbsUp, User } from "lucide-react";
 
 import { useGetChatAgents } from "@/components/chat-agents/hook/query/use-get-chat-agents";
 import { useGetFeedbackPatterns } from "@/components/chat-agents/hook/query/use-get-feedback-patterns";
@@ -16,6 +16,7 @@ import { ErrorState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getErrorMessage } from "@/lib/axios-config";
 import { reasonLabel } from "@/lib/feedback-reasons";
+import { textOnly } from "@/lib/widget-ui";
 import { cn } from "@/lib/utils";
 import type { FeedbackItem } from "@/types/chat-agent-types";
 
@@ -77,7 +78,7 @@ function FeedbackCard({ item }: { item: FeedbackItem }) {
         </p>
       ) : null}
 
-      <p className={cn("mt-2 whitespace-pre-wrap text-[13px] leading-relaxed", !open && "line-clamp-4")}>{item.reply}</p>
+      <p className={cn("mt-2 whitespace-pre-wrap text-[13px] leading-relaxed", !open && "line-clamp-4")}>{textOnly(item.reply)}</p>
       {item.reply.length > 320 ? (
         <button type="button" onClick={() => setOpen((v) => !v)} className="mt-1 text-[11px] font-medium text-primary hover:underline">
           {open ? "Show less" : "Show full reply"}
@@ -121,7 +122,7 @@ export function FeedbackView() {
       <PageHeader
         title="Feedback"
         subtitle="What testers liked and disliked, and where it clusters."
-        onRefresh={() => void query.refetch()}
+        onRefresh={() => query.refetch()}
         actions={
           <>
             <select
@@ -198,6 +199,60 @@ export function FeedbackView() {
                 />
               </Section>
             </div>
+
+            <Section
+              title="Lead capture by chatbot"
+              hint="Of the conversations started in this range: how many gave a name, how many a mobile number, and how many visitor messages it took. Likes tagged “convinced me”, “asked naturally” or “good offer” count as convincing; dislikes tagged “pushy”, “too early” or “scripted” count against."
+            >
+              {d.leads.length === 0 ? (
+                <p className="py-3 text-xs text-muted-foreground">No conversations in this range.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="text-left text-[10.5px] uppercase tracking-wider text-muted-foreground">
+                      <tr>
+                        <th className="pb-2 font-semibold">Chatbot</th>
+                        <th className="pb-2 text-right font-semibold">Chats</th>
+                        <th className="pb-2 text-right font-semibold">Names</th>
+                        <th className="pb-2 text-right font-semibold">Numbers</th>
+                        <th className="w-44 pb-2 font-semibold">Capture rate</th>
+                        <th className="pb-2 text-right font-semibold">Msgs to number</th>
+                        <th className="pb-2 text-right font-semibold">Convincing</th>
+                        <th className="pb-2 text-right font-semibold">Pushy</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {d.leads.map((row) => (
+                        <tr key={row.agent.id} className="border-t border-border">
+                          <td className="py-2 font-medium">
+                            {row.agent.name}
+                            {row.agent.status !== "active" ? <span className="ml-1.5 text-[10px] text-muted-foreground">({row.agent.status})</span> : null}
+                          </td>
+                          <td className="py-2 text-right tabular-nums">{row.conversations}</td>
+                          <td className="py-2 text-right tabular-nums">{row.withName}</td>
+                          <td className="py-2 text-right tabular-nums font-semibold">
+                            <span className="inline-flex items-center gap-1">
+                              <Phone className="size-3 text-success" /> {row.withPhone}
+                            </span>
+                          </td>
+                          <td className="py-2 pr-3">
+                            <div className="flex items-center gap-2">
+                              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                                <div className="h-full rounded-full bg-success" style={{ width: `${(row.captureRate ?? 0) * 100}%` }} />
+                              </div>
+                              <span className="w-9 text-right tabular-nums">{pct(row.captureRate)}</span>
+                            </div>
+                          </td>
+                          <td className="py-2 text-right tabular-nums">{row.avgTurnsToPhone ?? "—"}</td>
+                          <td className="py-2 text-right tabular-nums text-success">{row.convincingLikes}</td>
+                          <td className="py-2 text-right tabular-nums text-danger">{row.pushyDislikes}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Section>
 
             <div className="grid gap-4 xl:grid-cols-3">
               <Section title="By chatbot" className="xl:col-span-2">

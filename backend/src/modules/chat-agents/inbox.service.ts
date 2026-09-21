@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { previewText } from './ui-block.util';
 import type { ListInboxQueryDto } from './dto/list-inbox-query.dto';
 import type { ReviewThreadDto } from './dto/review-thread.dto';
 
@@ -45,6 +46,7 @@ export class InboxService {
         lastSeenAt: true,
         name: true,
         email: true,
+        phone: true,
         rating: true,
         ratingComment: true,
         reviewStatus: true,
@@ -98,6 +100,8 @@ export class InboxService {
           user: visitor.user,
           name: visitor.name,
           email: visitor.email,
+          /** Whether the visitor gave a mobile number - the sales test's own success flag. */
+          hasPhone: Boolean(visitor.phone),
           deviceType: visitor.deviceType,
           firstSeenAt: visitor.firstSeenAt,
           lastSeenAt: visitor.lastSeenAt,
@@ -106,7 +110,7 @@ export class InboxService {
           ratingComment: visitor.ratingComment,
           reviewStatus: visitor.reviewStatus,
           thumbs: thumbsByVisitor.get(visitor.id) ?? { up: 0, down: 0 },
-          lastMessage: last ? { role: last.role, preview: last.content.slice(0, 160), at: last.created_at } : null,
+          lastMessage: last ? { role: last.role, preview: previewText(last.content, 160), at: last.created_at } : null,
         };
       }),
       nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,

@@ -102,7 +102,7 @@ export function UsageView() {
       <PageHeader
         title="Token usage"
         subtitle="Every Claude call, all four token kinds, priced from the list rates."
-        onRefresh={() => void query.refetch()}
+        onRefresh={() => query.refetch()}
         actions={
           <>
             <select value={agentId} onChange={(e) => setAgentId(e.target.value)} className="h-8 rounded-md border border-border bg-background px-2 text-xs">

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FeedbackPatternsQueryDto } from './dto/feedback-patterns-query.dto';
-import { FEEDBACK_REASONS } from './dto/widget-feedback.dto';
+import { FEEDBACK_REASONS, SALES_REASONS } from './dto/widget-feedback.dto';
 
 /** Words that say nothing about what a question was about. */
 const STOP_WORDS = new Set(
@@ -228,9 +228,12 @@ export class FeedbackPatternsService {
       conversationStars: m.visitor.rating,
     });
 
+    const leads = await this.leadCapture(from, query.agentId, agentOf);
+
     const ratedCount = totals.likes + totals.dislikes;
     return {
       range: { from, to: now, days },
+      leads,
       totals: {
         ...totals,
         likeRate: rate(totals),
@@ -255,5 +258,94 @@ export class FeedbackPatternsService {
       disliked: rated.filter((m) => m.rating === 'down').slice(0, 100).map(item),
       notes: rated.filter((m) => m.feedbackNote).slice(0, 100).map(item),
     };
+  }
+
+  /**
+   * Lead capture per chatbot: of the conversations started in range, how many
+   * yielded a name, how many a mobile number, and how many visitor messages it
+   * took before the number appeared. This is what the sales personas are
+   * being judged on, so it sits at the top of the report.
+   */
+  private async leadCapture(
+    from: Date,
+    agentId: string | undefined,
+    agentOf: (id: string) => { id: string; name: string; status: string; avatarUrl: string | null; model: string | null },
+  ) {
+    const visitors = await this.prisma.chatWidgetVisitor.findMany({
+      where: { firstSeenAt: { gte: from }, messageCount: { gt: 0 }, ...(agentId ? { agentId } : {}) },
+      select: {
+        id: true,
+        agentId: true,
+        name: true,
+        phone: true,
+        fieldSources: true,
+        messages: {
+          orderBy: { createdAt: 'asc' },
+          select: { role: true, content: true, rating: true, feedbackReason: true },
+        },
+      },
+    });
+
+    type Row = {
+      conversations: number;
+      withName: number;
+      withPhone: number;
+      turns: number[];
+      convincingLikes: number;
+      pushyDislikes: number;
+    };
+    const rows = new Map<string, Row>();
+    const up = new Set<string>(SALES_REASONS.up);
+    const down = new Set<string>(SALES_REASONS.down);
+
+    for (const v of visitors) {
+      if (!rows.has(v.agentId)) rows.set(v.agentId, { conversations: 0, withName: 0, withPhone: 0, turns: [], convincingLikes: 0, pushyDislikes: 0 });
+      const row = rows.get(v.agentId)!;
+      row.conversations += 1;
+
+      const sources = ((v.fieldSources ?? {}) as Record<string, string>) || {};
+      // A name copied from the tester's account does not count - the bot had to earn it.
+      if (v.name && sources.name !== 'account') row.withName += 1;
+
+      if (v.phone) {
+        row.withPhone += 1;
+        const digits = v.phone.replace(/\D/g, '').slice(-10);
+        let userTurns = 0;
+        for (const m of v.messages) {
+          if (m.role !== 'user') continue;
+          userTurns += 1;
+          if (digits && m.content.replace(/\D/g, '').includes(digits)) {
+            row.turns.push(userTurns);
+            break;
+          }
+        }
+      }
+
+      for (const m of v.messages) {
+        if (m.role !== 'assistant' || !m.feedbackReason) continue;
+        if (m.rating === 'up' && up.has(m.feedbackReason)) row.convincingLikes += 1;
+        if (m.rating === 'down' && down.has(m.feedbackReason)) row.pushyDislikes += 1;
+      }
+    }
+
+    // A chatbot can have leads without a single thumb, so it may be missing from the
+    // feedback-derived lookup - resolve those here.
+    const ids = [...rows.keys()];
+    const named = ids.length ? await this.prisma.chatAgent.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, status: true, avatarUrl: true, model: true } }) : [];
+    const namedById = new Map(named.map((a) => [a.id, a]));
+    const resolve = (id: string) => namedById.get(id) ?? agentOf(id);
+
+    return [...rows.entries()]
+      .map(([id, r]) => ({
+        agent: resolve(id),
+        conversations: r.conversations,
+        withName: r.withName,
+        withPhone: r.withPhone,
+        captureRate: r.conversations ? Math.round((r.withPhone / r.conversations) * 1000) / 1000 : null,
+        avgTurnsToPhone: r.turns.length ? Math.round((r.turns.reduce((a, b) => a + b, 0) / r.turns.length) * 10) / 10 : null,
+        convincingLikes: r.convincingLikes,
+        pushyDislikes: r.pushyDislikes,
+      }))
+      .sort((a, b) => (b.captureRate ?? -1) - (a.captureRate ?? -1) || b.conversations - a.conversations);
   }
 }

@@ -74,13 +74,12 @@ export class WidgetController {
       '`assistantMessageId` so it can be rated with POST /widget/feedback/message.',
   })
   async chat(@Body() dto: WidgetChatDto, @Req() req: Request, @Headers('origin') origin?: string) {
-    const { reply, limited, retryAt, visitorToken, assistantMessageId } = await this.widget.chat(
-      dto,
-      origin,
-      readRequestContext(req),
-    );
+    const result = await this.widget.chat(dto, origin, readRequestContext(req));
+    const { reply, limited, retryAt, visitorToken, assistantMessageId } = result;
+    // The lead form the server adds after some replies, as a second bot message.
+    const followup = 'followup' in result ? (result.followup ?? null) : null;
     // `usage` stays server-side — it would tell an anonymous caller how large the knowledge base is.
-    return { reply, limited, retryAt, visitorToken, assistantMessageId };
+    return { reply, limited, retryAt, visitorToken, assistantMessageId, followup };
   }
 
   @Post('lead')

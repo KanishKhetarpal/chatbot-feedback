@@ -38,9 +38,9 @@ export const GUIDED_FLOW_LIMITS = {
   rootMin: 1,
   rootMax: 8,
   labelMaxLen: 80,
-  answerMaxLen: 2000,
+  answerMaxLen: 5000,
   nextMaxPerNode: 6,
-  maxDepth: 5,
+  maxDepth: 8,
   maxNodes: 100,
 } as const;
 
@@ -102,6 +102,29 @@ export const GuidedFlowSchema = z.object({
     .optional()
     .default('Great, thanks. Which programme are you interested in?'),
   nodes: z.record(z.string(), GuidedFlowNodeSchema),
+  /**
+   * A purely rule-based bot: the AI is never called. No typing, no AI
+   * follow-ups, and `escape_ai` is refused. Everything is the tree.
+   */
+  noAi: z.boolean().optional(),
+  /**
+   * Rule-based lead capture: after a random number of answered chips
+   * (between afterMin and afterMax), while the visitor has left no number, one
+   * of `prompts` (text + a stored `<ui>` form, taken in turn) is appended to the
+   * answer. Then again every `repeatEvery` answers, up to `maxTimes`.
+   */
+  capture: z
+    .object({
+      afterMin: z.number().int().min(1).max(10),
+      afterMax: z.number().int().min(1).max(10),
+      repeatEvery: z.number().int().min(1).max(10).default(3),
+      maxTimes: z.number().int().min(1).max(5).default(3),
+      prompts: z.array(z.string().trim().min(1).max(GUIDED_FLOW_LIMITS.answerMaxLen)).min(1).max(6),
+      /** From this many answers on, with no number yet, `gatePrompt` (a gate form) replaces the menu. */
+      gateAfter: z.number().int().min(1).max(20).optional(),
+      gatePrompt: z.string().trim().min(1).max(GUIDED_FLOW_LIMITS.answerMaxLen).optional(),
+    })
+    .optional(),
 });
 
 export type GuidedFlow = z.infer<typeof GuidedFlowSchema>;

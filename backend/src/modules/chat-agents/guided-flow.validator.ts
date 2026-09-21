@@ -121,27 +121,29 @@ export function validateGuidedFlow(flow: GuidedFlow): GuidedFlowIssue[] {
   }
 
   // ── 7. Depth ceiling ────────────────────────────────────────────────────
-  // A path is a distinct chain of node ids; cycles back to a root count as one
-  // completed path (they don't recurse forever because we track the depth of
-  // the FIRST visit, not the current). We use DFS with a per-path visited set.
-  const walk = (id: string, depth: number, path: Set<string>): void => {
-    if (depth > GUIDED_FLOW_LIMITS.maxDepth) {
+  // Depth is how many taps a visitor needs to reach a node: its shortest
+  // distance from a root chip (BFS). Cross-links and loops back to a topic are
+  // fine; what matters is that nothing sits too far from the menu. Mirrors the
+  // editor's guidedFlowDepths().
+  const depthOf = new Map<string, number>();
+  const bfs: { id: string; d: number }[] = flow.rootIds.filter((id) => nodeIds.has(id)).map((id) => ({ id, d: 1 }));
+  while (bfs.length > 0) {
+    const { id, d } = bfs.shift() as { id: string; d: number };
+    if (depthOf.has(id)) continue;
+    depthOf.set(id, d);
+    for (const nextId of nodes[id]?.next ?? []) {
+      if (nodeIds.has(nextId) && !depthOf.has(nextId)) bfs.push({ id: nextId, d: d + 1 });
+    }
+  }
+  for (const [id, d] of depthOf) {
+    if (d > GUIDED_FLOW_LIMITS.maxDepth) {
       issues.push({
         code: 'depth_exceeded',
-        message: `Path through "${id}" exceeds max depth ${GUIDED_FLOW_LIMITS.maxDepth}.`,
+        message: `"${id}" sits ${d} chips deep (max ${GUIDED_FLOW_LIMITS.maxDepth}).`,
         where: id,
       });
-      return;
     }
-    if (reserved.has(id as ReservedNodeId)) return; // reserved ids terminate the path
-    const node = nodes[id];
-    if (!node) return;
-    if (path.has(id)) return; // cycle — stop, already counted along another path
-    const nextPath = new Set(path);
-    nextPath.add(id);
-    for (const nextId of node.next) walk(nextId, depth + 1, nextPath);
-  };
-  for (const rid of flow.rootIds) walk(rid, 1, new Set<string>());
+  }
 
   // Dedup depth_exceeded issues (multiple paths through the same node → same message).
   const seenDepth = new Set<string>();

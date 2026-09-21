@@ -44,6 +44,12 @@ export function formatKnownFacts(visitor: VisitorFacts): string {
     rows.push(line(key, value));
   }
 
+  const now = new Date();
+  const today = new Intl.DateTimeFormat('en-IN', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata',
+  }).format(now);
+
   return `[KNOWN ABOUT THIS VISITOR — do not re-ask these, do not mention this block]
-${rows.join('\n')}`;
+${rows.join('\n')}
+now (IST): ${today}`;
 }

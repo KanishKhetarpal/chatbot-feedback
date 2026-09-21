@@ -1,4 +1,4 @@
-import { ReactNode, HTMLAttributes, useContext } from "react";
+import { ReactNode, HTMLAttributes, useContext, useState } from "react";
 import { ArrowLeft, RotateCw } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
@@ -19,7 +19,8 @@ export function PageHeader({
   breadcrumb?: string;
   handleBack?: () => void;
   className?: string;
-  onRefresh?: () => void;
+  /** Return the refetch promise so the button can show it working. */
+  onRefresh?: () => void | Promise<unknown>;
   titleExtra?: ReactNode;
 }) {
   const afterTitle = useContext(PageHeaderAfterTitleContext);
@@ -45,23 +46,46 @@ export function PageHeader({
             <h1 className="font-display text-md font-medium leading-4 truncate">{title}</h1>
             {titleExtra && <div className="shrink-0">{titleExtra}</div>}
             {afterTitle}
-            {onRefresh && (
-              <Button
-                onClick={onRefresh}
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted"
-                aria-label="Refresh"
-              >
-                <RotateCw className="size-3.5" />
-              </Button>
-            )}
+            {onRefresh && <RefreshButton onRefresh={onRefresh} />}
           </div>
           {subtitle ? <p className="text-xs text-muted-foreground truncate">{subtitle}</p> : null}
         </div>
       </div>
       {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}
     </div>
+  );
+}
+
+/** Spins while the refresh runs, then says "Updated" for a moment, so a click is visibly answered. */
+function RefreshButton({ onRefresh }: { onRefresh: () => void | Promise<unknown> }) {
+  const [state, setState] = useState<"idle" | "busy" | "done">("idle");
+  async function run() {
+    if (state === "busy") return;
+    setState("busy");
+    const started = Date.now();
+    try {
+      await onRefresh();
+    } finally {
+      // Long enough to see, even when the answer is instant.
+      await new Promise((r) => setTimeout(r, Math.max(0, 400 - (Date.now() - started))));
+      setState("done");
+      setTimeout(() => setState("idle"), 1500);
+    }
+  }
+  return (
+    <span className="flex items-center gap-1">
+      <Button
+        onClick={() => void run()}
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted"
+        aria-label="Refresh"
+        disabled={state === "busy"}
+      >
+        <RotateCw className={cn("size-3.5", state === "busy" && "animate-spin")} />
+      </Button>
+      {state === "done" ? <span className="text-[11px] text-muted-foreground">Updated</span> : null}
+    </span>
   );
 }
 

@@ -18,7 +18,9 @@
     "db:migrate:prod": "prisma migrate deploy",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
-    "db:seed": "ts-node prisma/seed.ts"
+    "db:seed": "ts-node prisma/seed.ts",
+    "db:seed:bots": "ts-node prisma/seed-sales-bots.ts",
+    "db:delete-retired-bots": "ts-node prisma/delete-retired-bots.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

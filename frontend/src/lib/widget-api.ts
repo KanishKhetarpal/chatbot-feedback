@@ -480,6 +480,8 @@ export type SendWidgetMessageResult = {
   issuedToken: string | null;
   /** The stored id of the reply, so a thumbs vote can be attached to it. */
   assistantMessageId: string | null;
+  /** A second bot message the server added after the reply (the details form). */
+  followup: { id: string; content: string } | null;
 };
 
 /**
@@ -526,6 +528,7 @@ export async function sendWidgetMessage(
     limited?: boolean;
     visitorToken?: string | null;
     assistantMessageId?: string | null;
+    followup?: { id: string; content: string } | null;
   };
 
   async function* frames(): AsyncGenerator<WidgetStreamEvent> {
@@ -542,5 +545,46 @@ export async function sendWidgetMessage(
     frames: frames(),
     issuedToken: body.visitorToken ?? null,
     assistantMessageId: body.assistantMessageId ?? null,
+    followup: body.followup?.content ? body.followup : null,
   };
+}
+
+/** Window event (detail = agent key) that tells an open widget to start a new chat. */
+export const WIDGET_RESET_EVENT = "widget:new-chat";
+
+/** Ask the open widget for this bot to start over from fresh. */
+export function requestNewWidgetChat(agentKey: string) {
+  window.dispatchEvent(new CustomEvent(WIDGET_RESET_EVENT, { detail: agentKey }));
+}
+
+/** Forget this browser's conversation with a bot: the next message starts a new thread. */
+export function forgetWidgetConversation(agentKey: string) {
+  try {
+    localStorage.removeItem(tokenKey(agentKey));
+    localStorage.removeItem(historyKey(agentKey));
+    localStorage.removeItem(capturedKey(agentKey));
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Ask the bot to follow up with a visitor who has gone quiet. Returns null when
+ * the server declines (not right after a bot turn, already nudged, or the
+ * conversation's nudge allowance is used up) — that is normal, not an error.
+ */
+export async function requestWidgetNudge(input: {
+  token: string;
+}): Promise<{ reply: string; assistantMessageId: string | null } | null> {
+  assertConfigured();
+  const res = await fetch(`${BASE}/widget/chat`, {
+    method: "POST",
+    headers: widgetHeaders(),
+    body: JSON.stringify({ visitorToken: input.token, message: "(follow-up)", nudge: true }),
+  });
+  if (!res.ok) return null;
+  const body = (await res.json().catch(() => ({}))) as { reply?: string | null; assistantMessageId?: string | null };
+  return typeof body.reply === "string" && body.reply.trim()
+    ? { reply: body.reply, assistantMessageId: body.assistantMessageId ?? null }
+    : null;
 }

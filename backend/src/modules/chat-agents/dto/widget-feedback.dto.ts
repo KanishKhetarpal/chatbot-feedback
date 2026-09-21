@@ -9,8 +9,14 @@ export const MESSAGE_RATINGS = ['up', 'down'] as const;
  * so the admin screen can count them - the note is where free text goes.
  */
 export const FEEDBACK_REASONS = {
-  up: ['accurate', 'helpful', 'clear', 'friendly', 'fast'],
-  down: ['incorrect', 'unclear', 'off_topic', 'too_long', 'unhelpful', 'tone'],
+  up: ['convincing', 'natural_ask', 'good_offer', 'accurate', 'helpful', 'clear', 'friendly', 'fast'],
+  down: ['pushy', 'too_early', 'scripted', 'incorrect', 'unclear', 'off_topic', 'too_long', 'unhelpful', 'tone'],
+} as const;
+
+/** The reasons that say something about lead capture specifically - the sales test's own signal. */
+export const SALES_REASONS = {
+  up: ['convincing', 'natural_ask', 'good_offer'],
+  down: ['pushy', 'too_early', 'scripted'],
 } as const;
 export const ALL_FEEDBACK_REASONS = [...FEEDBACK_REASONS.up, ...FEEDBACK_REASONS.down] as const;
 export type FeedbackReason = (typeof ALL_FEEDBACK_REASONS)[number];
