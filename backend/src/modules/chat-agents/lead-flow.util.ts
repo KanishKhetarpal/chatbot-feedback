@@ -39,6 +39,28 @@ export function detectName(message: string): string | null {
   return m ? m[1] : null;
 }
 
+/** True when a stored bot message carried a form asking for name, phone or email. */
+export function storedHasLeadForm(content: string | undefined): boolean {
+  const raw = content?.match(/<ui>([\s\S]*?)<\/ui>/)?.[1];
+  if (!raw) return false;
+  try {
+    const ui = JSON.parse(raw) as { type?: string; fields?: string[] };
+    return ui.type === 'form' && Array.isArray(ui.fields) && ui.fields.some((f) => LEAD_FIELDS.has(f));
+  } catch {
+    return false;
+  }
+}
+
+/** The visitor asked for something that genuinely needs their details. */
+export function asksForContactStep(message: string): boolean {
+  return /\b(call|callback|call back|video|visit|book|whatsapp|send|report|guide|slot|counsell?or)\b/i.test(message);
+}
+
+/** A follow-up bubble that asks for the name or number (dropped when a details form is already coming). */
+export function asksForDetails(text: string): boolean {
+  return /\b(your name|call you|what should i call|number|whatsapp|mobile)\b/i.test(text);
+}
+
 /** A question the visitor answers by tapping or filling in. */
 export function isBlockingUi(ui: UiBlock | null): boolean {
   return Boolean(ui && (ui.type === 'chips' || ui.type === 'select' || ui.type === 'form'));

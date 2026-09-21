@@ -234,6 +234,37 @@ function parseLenient<T>(schema: z.ZodType<T>, input: unknown) {
   return schema.safeParse(value);
 }
 
+/** Drop a question that ends the text: the last sentence of the last paragraph, if it asks one. */
+function withoutClosingQuestion(text: string): string {
+  const paragraphs = text.split(/\n\s*\n/);
+  const last = paragraphs[paragraphs.length - 1] ?? '';
+  if (!/\?\s*$/.test(last) || /^\s*[-*•]|^\s*\[[a-z]+\]/im.test(last.split('\n').pop() ?? '')) return text;
+  const sentences = last.trim().split(/(?<=[.!])\s+/);
+  sentences.pop();
+  const kept = sentences.join(' ').trim();
+  const rest = paragraphs.slice(0, -1);
+  if (kept) rest.push(kept);
+  // Never empty the answer entirely.
+  return rest.length ? rest.join('\n\n').trim() : text;
+}
+
+const DEFAULT_TITLES: Record<string, string> = {
+  card: 'Summary',
+  fits: 'Your top picks',
+  guide: 'Your Acharya guide',
+  form: 'Your details',
+};
+
+/** A missing title is not worth losing the whole element over. */
+function withDefaultTitle(value: unknown): unknown {
+  if (!value || typeof value !== 'object') return value;
+  const block = value as { type?: string; title?: unknown };
+  if (block.type && DEFAULT_TITLES[block.type] && (typeof block.title !== 'string' || !block.title.trim())) {
+    return { ...block, title: DEFAULT_TITLES[block.type] };
+  }
+  return value;
+}
+
 const tagRe = (tag: string) => new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'gi');
 const openTagRe = (tag: string) => new RegExp(`<${tag}>[\\s\\S]*$`, 'i');
 
@@ -250,7 +281,7 @@ export function extractReplyParts(reply: string): ReplyParts {
   let text = reply
     .replace(tagRe(UI_TAG), (_m, raw: string) => {
       try {
-        const parsed = parseLenient(UiBlockSchema, JSON.parse(raw.trim()));
+        const parsed = parseLenient(UiBlockSchema, withDefaultTitle(JSON.parse(raw.trim())));
         if (parsed.success) ui = cleanDeep(parsed.data);
         else {
           rejected = true;
@@ -335,6 +366,10 @@ export function extractReplyParts(reply: string): ReplyParts {
   // A question element is the one question of this reply: a second one in a
   // follow-up bubble would compete with it.
   if (blocking && /\?\s*$/.test(then)) then = '';
+
+  // One question per reply: when the follow-up bubble asks one, a question
+  // closing the answer itself goes (the bubble is the planned next step).
+  if (/\?\s*$/.test(then)) text = withoutClosingQuestion(text);
 
   // When the next step needs their details, the form is the next step: no
   // side suggestions pulling away from it (its "not now" is the way out).

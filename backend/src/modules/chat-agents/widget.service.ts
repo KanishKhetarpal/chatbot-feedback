@@ -26,9 +26,12 @@ import { composeStored, extractReplyParts } from './ui-block.util';
 import {
   AUTO_MARKER,
   autoLeadMessage,
+  asksForContactStep,
+  asksForDetails,
   detectName,
   isLeadForm,
   requireContact,
+  storedHasLeadForm,
   LEAD_GATE_AFTER,
   LEAD_SOFT_AFTER,
   withoutKnownFields,
@@ -389,17 +392,24 @@ export class WidgetService {
       email: contact?.email || learned.email || null,
     };
     parts.ui = requireContact(withoutKnownFields(parts.ui, knownNow), knownNow);
+
+    // Right after a details form went unanswered, the next reply does not ask
+    // again, unless the visitor asked for something that needs their details.
+    const lastBot = [...history].reverse().find((m) => m.role === 'assistant');
+    if (!knownNow.phone && !dto.nudge && isLeadForm(parts.ui) && storedHasLeadForm(lastBot?.content) && !asksForContactStep(dto.message)) {
+      parts.ui = null;
+    }
     if (isLeadForm(parts.ui)) parts.next = [];
-    const cleanReply = composeStored(parts);
-    if (agent.qualificationEnabled && !dto.nudge) {
-      await this.persistFacts(visitor.id, learned, facts);
+
+    // Photos are for impact: never two replies in a row, unless they asked to see something.
+    if (parts.media.length && lastBot?.content.includes('<media>') && !/\b(show|see|photo|pic|picture|look|image)\b/i.test(dto.message ?? '')) {
+      parts.media = [];
     }
 
-    // The lead rules: after the 3rd reply a details form (skippable, once);
-    // from the 6th, a compulsory one. Each arrives as its own message.
-    // Exactly at the 3rd reply (skippable) and the 6th (compulsory). If the reply
-    // is itself a question (a quiz step), the widget keeps that question
-    // answerable beside the skippable form; the compulsory one replaces it.
+    // The lead rules: exactly at the 3rd reply (skippable) and the 6th
+    // (compulsory), each as its own message. If the reply is itself a question
+    // (a quiz step), the widget keeps that question answerable beside the
+    // skippable form; the compulsory one replaces it.
     let followup: string | null = null;
     if (!knownNow.phone && !dto.nudge) {
       const replies = botReplies + 1;
@@ -410,6 +420,13 @@ export class WidgetService {
         await this.markLead(visitor.id, 'leadSoftShown');
         if (!isLeadForm(parts.ui)) followup = autoLeadMessage('soft', knownNow);
       }
+    }
+    // The form is the ask: no second "what's your name?" bubble beside it.
+    if ((followup || isLeadForm(parts.ui)) && parts.then && asksForDetails(parts.then)) parts.then = '';
+
+    const cleanReply = composeStored(parts);
+    if (agent.qualificationEnabled && !dto.nudge) {
+      await this.persistFacts(visitor.id, learned, facts);
     }
     const cleaned = { ...result, text: cleanReply };
 
