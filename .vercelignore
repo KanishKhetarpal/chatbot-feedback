@@ -1,0 +1,9 @@
+# Vercel builds only the frontend (project root directory: frontend).
+# Keep the backend, secrets and local tooling out of the upload.
+backend
+docs
+.claude
+**/node_modules
+**/dist
+**/.env
+**/.env.*
