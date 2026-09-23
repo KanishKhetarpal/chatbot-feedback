@@ -124,6 +124,13 @@ pnpm db:seed:bots -- riya    # only files whose name contains "riya"
 
 **Phone verification ([`widget-otp.service.ts`](backend/src/modules/chat-agents/widget-otp.service.ts)).** A number is verified before it is stored. The form carries a country selector and only accepts the number of digits that country actually uses (`lib/phone-countries.ts`); submitting it sends a 6-digit code over WhatsApp and swaps the card for a code screen with a resend timer and "change number". The rules are the CRM's, copied: 10-minute code, 3 wrong guesses, 3 codes per number per hour, delivered on the approved `student_crm_otp` AUTHENTICATION template through the same Mcube account as the bot (its copy-code button takes the code as a second parameter, or Meta refuses the send with #131008). Verified numbers are marked `phoneVerified` / `verifiedVia: whatsapp_otp` on the visitor. When the environment cannot send at all (no Mcube, or the number is outside `WHATSAPP_ALLOWED_NUMBERS`), the form stores the number unverified rather than losing the lead; `WIDGET_OTP_DEV_ECHO=true` returns the code in the response so the flow stays testable locally.
 
+**Testing the bots ([`backend/scripts/qa/`](backend/scripts/qa/README.md)).** Two scripted suites drive whole conversations through the real endpoints and check every reply against the house rules: one question per message, no filler openers, sane buttons, no figure the bot may not quote, no ranking claim the knowledge does not make, nothing repeated word for word, and a details ask that names what a counsellor will do. `web.mjs` posts to `/widget/chat` exactly as the widget does; `whatsapp.mjs` runs the in-app simulator (nothing reaches a phone) with the CRM-derived facts written onto the contact first.
+
+```bash
+node backend/scripts/qa/web.mjs <publicKey>
+QA_PASS=<admin password> node backend/scripts/qa/whatsapp.mjs
+```
+
 **Rule-based bots.** A guided flow with `"noAi": true` never reaches the model: typed messages and idle follow-ups are refused, and training skips the cache warm-up. Answers may hold several wordings separated by a `~~~` line (one is picked at random); a node with no next chips returns the menu; `capture` appends a lead form after a random number of answers while no number has been left. Depth is the shortest number of taps from the menu (max 8).
 
 **Judging them.** The Feedback page opens with a *Lead capture by chatbot* table. Every reply has one-tap thumbs with sales-specific reasons, and conversations that yielded a number carry a **Lead** badge in Conversations. "New chat" (sidebar or chat header) starts a bot's conversation fresh; the old one stays in Conversations.

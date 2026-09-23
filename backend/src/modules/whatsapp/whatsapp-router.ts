@@ -60,6 +60,8 @@ const COST_PUSHBACK_RE =
   /\b(too (high|much|expensive|costly)|can'?t afford|cannot afford|not affordable|out of (my |our )?budget|bahut (zyada|mehnga)|mehnga|costly)\b/i;
 const CALL_RE = /\b(call me|call back|callback|give me a call|phone me|ring me)\b/i;
 const STOP_RE = /^\s*(stop|unsubscribe|stop messages|stop all|opt out|optout|don'?t message( me)?|band karo)\s*[.!]*\s*$/i;
+/** "yes" in the words people actually use, including Hinglish. */
+const AFFIRMATIVE_RE = /^\s*(y|ya|yes|yeah|yep|yup|ok|okay|okey|k|kk|sure|please do|pls|plz|do it|go ahead|haan|han|ha|hanji|theek hai|thik hai|sahi hai)\s*[.!]*\s*$/i;
 const START_RE = /^\s*(start|resume|unstop|subscribe)\s*[.!]*\s*$/i;
 const GREETING_RE = /^\s*(hi+|hii+|hello+|hey+|hlo|helo|namaste|namaskar|good (morning|afternoon|evening)|menu|main menu|options|help|start over)\s*[.!]*\s*$/i;
 
@@ -110,6 +112,10 @@ export function route(input: {
   afterTemplateOnly?: boolean;
   /** The CRM holds an application-fee figure for this person, so Tara may state it. */
   applicationFeeKnown?: boolean;
+  /** Our last message asked whether to pass their request to an office. */
+  awaitingDeptPass?: boolean;
+  /** How many of their last messages in a row we could not read. */
+  unclearRun?: number;
 }): Decision {
   const text = (input.text ?? '').trim();
   const id = input.optionId ?? '';
@@ -156,6 +162,9 @@ export function route(input: {
   if (MENU_QUESTIONS[id]) return { type: 'ai', message: MENU_QUESTIONS[id] };
 
   if (!text) return input.firstContact ? { type: 'welcome' } : { type: 'ignore' };
+  // They were asked whether to pass it to an office, and said yes in their own
+  // words. Repeating the same offer at them is the worst answer available.
+  if (input.awaitingDeptPass && AFFIRMATIVE_RE.test(text)) return { type: 'dept_pass' };
   if (isUnclear(text)) return { type: 'unclear' };
   const slot = CALL_SLOTS.find((s) => s.title.toLowerCase() === text.toLowerCase());
   if (slot) return { type: 'handoff_slot', slot: slot.title };
@@ -204,9 +213,27 @@ export function isUnclear(text: string): boolean {
   return false;
 }
 
-export function unclearMessages(pending: WaOption[]): OutboundMessage[] {
-  if (pending.length) return composeInteractive("Sorry, I didn't get that. Tap one, or type your question:", pending);
-  return [{ kind: 'text', body: "Sorry, I didn't get that. What would you like to know?" }];
+/**
+ * Two "??" in a row used to get the same sentence twice, which reads like a
+ * machine. The wording moves on, and the second time it offers a person rather
+ * than asking them to try again.
+ */
+const UNCLEAR_LINES = [
+  "Sorry, I didn't get that. Tap one, or type your question:",
+  "Still not sure what you mean. Pick one of these, or write it in your own words:",
+];
+
+export function unclearMessages(pending: WaOption[], previous = 0): OutboundMessage[] {
+  if (previous >= 2) {
+    const options: WaOption[] = [
+      { id: 'handoff:ask', title: 'Talk to a person' },
+      ...pending.slice(0, 2),
+    ];
+    return composeInteractive('I am not following, and I would rather not guess. Someone from the team can help:', options);
+  }
+  const line = UNCLEAR_LINES[Math.min(previous, UNCLEAR_LINES.length - 1)];
+  if (pending.length) return composeInteractive(line, pending);
+  return [{ kind: 'text', body: previous ? 'Tell me in your own words what you are looking for.' : "Sorry, I didn't get that. What would you like to know?" }];
 }
 
 /** Already at Acharya (or connected to it): served, never sold to. */
@@ -313,10 +340,40 @@ export function studentMenuMessages(): OutboundMessage[] {
 export const OTHER_TEXT =
   'Parents, alumni, recruiters and visitors all write here too. What can I help you with?';
 
+/**
+ * The model's own lead line, with anything the scripted block is about to say
+ * taken out of it.
+ *
+ * Two things went wrong in testing: Tara wrote the office's number herself and
+ * it printed twice, and she ended on her own question so the message asked two
+ * things. Both are removed here, because the scripted part below always says
+ * the contact and always asks the question.
+ */
+function withoutDuplication(lead: string, contact: string): string {
+  if (!lead.trim()) return '';
+  // Every phone number and address in the contact line, separately: the hostel
+  // office carries two numbers, and matching the whole string missed a line
+  // that repeated only the first.
+  const parts = [...(contact.match(/\d[\d\s-]{7,}\d/g) ?? []).map((n) => n.replace(/\D/g, '')), ...(contact.match(/[\w.+-]+@[\w.-]+/g) ?? [])];
+  const lines = lead
+    .split('\n')
+    .filter((line) => !parts.some((part) => (/@/.test(part) ? line.includes(part) : line.replace(/\D/g, '').includes(part))));
+  // The scripted block below asks the one question of this message, so any
+  // question of Tara's own goes with it: two questions in one message is the
+  // complaint the owner raised, and hers cannot be answered from here anyway.
+  const kept = lines.join('\n').trim();
+  return kept
+    .split(/(?<=[.!?])\s+/)
+    .filter((sentence) => !/\?\s*$/.test(sentence))
+    .join(' ')
+    .trim();
+}
+
 export function deptHandoffMessages(key: string, lead = ''): OutboundMessage[] {
   const d = department(key);
+  const intro = withoutDuplication(lead, d.contact);
   return composeInteractive(
-    `${lead ? `${lead}\n\n*${d.label}*: ${d.contact}` : `The *${d.label}* handles that: ${d.contact}.`}\n\nShall I send them your request with your number, so they get back to you?`,
+    `${intro ? `${intro}\n\n*${d.label}*: ${d.contact}` : `The *${d.label}* handles that: ${d.contact}.`}\n\nShall I send them your request with your number, so they get back to you?`,
     [
       { id: 'dept:pass', title: 'Pass it on' },
       { id: 'handoff:continue', title: 'Keep chatting' },

@@ -34,11 +34,9 @@ export interface LeadScore {
 export interface ScoreInput {
   /** prospective | student | student_parent | alumni | recruiter | other | null */
   audience: string | null;
-  stage: string;
   optedOut: boolean;
   /** Their messages, newest first, as plain text. */
   inbound: Array<{ body: string | null; createdAt: Date }>;
-  outboundCount: number;
   lastInboundAt: Date | null;
   /** Follow-ups sent since their last reply: silence after a nudge is a signal. */
   followupCount: number;

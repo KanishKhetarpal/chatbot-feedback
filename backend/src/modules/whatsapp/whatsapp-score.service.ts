@@ -37,14 +37,13 @@ export class WhatsappScoreService implements OnApplicationBootstrap {
       });
       if (!contact) return null;
 
-      const [inbound, outboundCount, lastOut] = await Promise.all([
+      const [inbound, lastOut] = await Promise.all([
         this.prisma.whatsappMessage.findMany({
           where: { contactId, direction: 'in' },
           orderBy: { createdAt: 'desc' },
           take: 40,
           select: { body: true, createdAt: true },
         }),
-        this.prisma.whatsappMessage.count({ where: { contactId, direction: 'out' } }),
         this.prisma.whatsappMessage.findFirst({
           where: { contactId, direction: 'out' },
           orderBy: { createdAt: 'desc' },
@@ -57,10 +56,8 @@ export class WhatsappScoreService implements OnApplicationBootstrap {
 
       const result = scoreLead({
         audience: str('audience'),
-        stage: contact.stage,
         optedOut: !!contact.optedOutAt,
         inbound,
-        outboundCount,
         lastInboundAt: contact.lastInboundAt,
         followupCount: contact.followupCount,
         lastOutboundRead: !!lastOut?.readAt,

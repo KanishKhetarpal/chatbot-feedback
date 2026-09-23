@@ -439,6 +439,12 @@ export class WidgetService {
       const alreadyAsking = isBlockingUi(parts.ui);
       if (gateAfter > 0 && replies >= gateAfter) {
         if (alreadyAsking) parts.ui = null;
+        // Card actions, follow-up bubbles and suggestions would all be dead
+        // taps under a compulsory form: the server answers nothing until the
+        // number is left, so the form is the only thing left to do.
+        if (parts.ui && 'actions' in parts.ui) parts.ui = { ...parts.ui, actions: [] };
+        parts.then = '';
+        parts.next = [];
         followup = autoLeadMessage('gate', knownNow, leadTopic);
         await this.markLead(visitor.id, 'leadGateShown');
       } else if (softAfter > 0 && replies >= softAfter && !leadState.softShown && !alreadyAsking) {
@@ -979,12 +985,10 @@ export class WidgetService {
     if (!e164) {
       throw new BadRequestException({ message: 'That does not look like a complete number for that country.', error: 'phone_invalid' });
     }
-    // One conversation cannot be used to hammer many numbers.
-    const verdict = await this.limits.consumeVisitor(visitor.id);
-    if (!verdict.allowed) {
-      throw new BadRequestException({ message: 'Too many requests. Try again shortly.', error: 'rate_limited' });
-    }
-    const result = await this.otp.request(e164);
+    // One conversation cannot be used to hammer many numbers. This is the OTP
+    // service's own counter: the visitor's chat budget pays for answers, and
+    // spending it here would cut a real conversation short.
+    const result = await this.otp.request(e164, visitor.id);
     return { ...result, visitorToken: issued };
   }
 
@@ -1006,32 +1010,30 @@ export class WidgetService {
     }
     this.otp.verify(e164, dto.code);
 
-    const lead = await this.captureLead({ ...dto, phone: e164 } as WidgetLeadDto, origin, request);
-    const visitorId = await this.visitorIdFor(dto, agent.id, request);
-    if (visitorId) {
-      const row = await this.prisma.chatWidgetVisitor.findUnique({ where: { id: visitorId }, select: { custom: true } });
-      const custom = ((row?.custom ?? {}) as Record<string, unknown>) || {};
-      await this.prisma.chatWidgetVisitor.update({
-        where: { id: visitorId },
-        data: { custom: { ...custom, phoneVerified: true, verifiedVia: 'whatsapp_otp' } as object },
-      });
-    }
+    const { result, visitorId } = await this.captureLeadFor({ ...dto, phone: e164 } as WidgetLeadDto, origin, request);
+    const row = await this.prisma.chatWidgetVisitor.findUnique({ where: { id: visitorId }, select: { custom: true } });
+    const custom = ((row?.custom ?? {}) as Record<string, unknown>) || {};
+    await this.prisma.chatWidgetVisitor.update({
+      where: { id: visitorId },
+      data: { custom: { ...custom, phoneVerified: true, verifiedVia: 'whatsapp_otp' } as object },
+    });
     this.logger.log(`widget-otp verified agent=${agent.id} phone=${this.otp.mask(e164)}`);
-    return { ...lead, verified: true };
-  }
-
-  /** The visitor this request belongs to, without creating one. */
-  private async visitorIdFor(dto: { visitorToken?: string }, agentId: string, request?: RequestContext): Promise<string | null> {
-    if (!dto.visitorToken) return null;
-    try {
-      const { visitor } = await this.resolveOrCreateVisitor(dto as never, agentId, request);
-      return visitor.id;
-    } catch {
-      return null;
-    }
+    return { ...result, verified: true };
   }
 
   async captureLead(dto: WidgetLeadDto, origin?: string, request?: RequestContext) {
+    const { result } = await this.captureLeadFor(dto, origin, request);
+    return result;
+  }
+
+  /**
+   * The capture itself, which also says which visitor it landed on.
+   *
+   * Verification needs that id: resolving the visitor a second time would
+   * create a fresh row whenever the token has expired, and the "verified" flag
+   * would then be written to a conversation nobody is having.
+   */
+  private async captureLeadFor(dto: WidgetLeadDto, origin?: string, request?: RequestContext) {
     const agent = await this.resolveChatAgent(dto);
     this.assertOriginAllowed(agent.allowedOrigins, origin);
     this.assertActive(agent.status);
@@ -1059,7 +1061,7 @@ export class WidgetService {
 
     this.logger.log(`widget-lead agent=${agent.id} visitor=${resolved.id} name="${name ?? ''}" phone=${phone ?? ''}`);
 
-    return { ok: true, leadCreated: false, deduped: false, visitorToken: issued };
+    return { result: { ok: true, leadCreated: false, deduped: false, visitorToken: issued }, visitorId: resolved.id };
   }
 
   /** Keeps digits and a leading `+`; the widget already validated the shape. */

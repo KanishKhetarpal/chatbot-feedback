@@ -1,4 +1,4 @@
-import { cleanVisible } from '../chat-agents/ui-block.util';
+import { cleanVisible, stripFillerOpener } from '../chat-agents/ui-block.util';
 import { WA_DOCUMENTS, WA_PHOTOS } from './whatsapp-media';
 import { extractFactsTag, type ExtractedFacts } from '../chat-agents/lead-extract.util';
 import { WA_LIMITS, type OutboundMessage, type WaOption } from './whatsapp.types';
@@ -29,19 +29,6 @@ export interface WhatsappReply {
 }
 
 const tagRe = (tag: string) => new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'gi');
-
-/**
- * Openers the owner has banned ("Good pick,", "Great question!", "Sure,"). The
- * prompt forbids them and the model still slips, so they are cut here as well.
- */
-const FILLER_OPENER =
-  /^(?:(?:good|great|nice|lovely|awesome|perfect|excellent|sure|absolutely|of course|fair|no worries|got it|noted|okay|ok|alright|understood|cool|makes sense|that'?s fine|that'?s okay|that'?s great|good to know|nice to know|fair enough|fair point|no problem|fine|all right|right|just checking|quick check|let'?s skip that(?: then)?)(?:\s+(?:pick|choice|question|one|call|field|stuff|then|to know))?(?:,?\s+(?:that'?s|it'?s) (?:fine|okay|ok|great)(?: at this stage| for now)?)?\s*[,.!:]+\s*)+/i;
-
-export function stripFillerOpener(text: string): string {
-  const cut = text.replace(FILLER_OPENER, '');
-  if (cut === text || !cut.trim()) return text;
-  return cut.charAt(0).toUpperCase() + cut.slice(1);
-}
 
 const MAX_WORDS = 40;
 

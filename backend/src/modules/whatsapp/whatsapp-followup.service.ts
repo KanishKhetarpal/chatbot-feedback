@@ -60,15 +60,13 @@ export class WhatsappFollowupService implements OnModuleInit {
 
   async onModuleInit() {
     this.bot.followups = this;
-    // The page starts with the sales playbook; after that it is theirs to edit.
-    // Playbook rules added in a later release are created once, by name, so an
-    // existing install gets them too. Edits and deletions are never undone:
-    // only a name that has never been there is added.
-    const existing = await this.prisma.whatsappFollowupRule.findMany({ select: { name: true } });
-    const known = new Set(existing.map((r) => r.name));
-    const missing = DEFAULT_RULES.filter((r) => !known.has(r.name));
-    for (const rule of missing) await this.prisma.whatsappFollowupRule.create({ data: this.toData(rule) });
-    if (missing.length) this.logger.log(`Created ${missing.length} default follow-up rule(s): ${missing.map((r) => r.name).join(', ')}.`);
+    // The page starts with the sales playbook; after that it is theirs. Seeding
+    // only on an empty table is what makes a deletion stick: re-adding a rule
+    // by name every boot would quietly undo the owner's edit.
+    if ((await this.prisma.whatsappFollowupRule.count()) === 0) {
+      for (const rule of DEFAULT_RULES) await this.prisma.whatsappFollowupRule.create({ data: this.toData(rule) });
+      this.logger.log(`Created ${DEFAULT_RULES.length} default follow-up rules.`);
+    }
   }
 
   // ── Rules (the admin page) ────────────────────────────────────────────────

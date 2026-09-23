@@ -333,6 +333,8 @@ export class WhatsappBotService implements OnApplicationBootstrap, OnApplication
         paused: !!contact.botPausedUntil && contact.botPausedUntil > new Date(),
         optedOut: !!contact.optedOutAt,
         applicationFeeKnown: this.knows(contact, 'applicationFee'),
+        awaitingDeptPass: await this.awaitingDeptPass(contact.id),
+        unclearRun: await this.unclearRun(contact.id),
       });
 
       let result: TurnResult;
@@ -633,7 +635,13 @@ export class WhatsappBotService implements OnApplicationBootstrap, OnApplication
         return this.restartInQueue(contact.id, null);
 
       case 'unclear':
-        return this.reply(contact, unclearMessages(this.pendingOf(contact)), 'system', transport, decision.type);
+        return this.reply(
+          contact,
+          unclearMessages(this.pendingOf(contact), await this.unclearRun(contact.id)),
+          'system',
+          transport,
+          decision.type,
+        );
 
       case 'snooze':
         return this.reply(contact, [{ kind: 'text', body: SNOOZE_TEXT }], 'system', transport, decision.type);
@@ -890,7 +898,12 @@ export class WhatsappBotService implements OnApplicationBootstrap, OnApplication
         data: { followupRuleId: opts.tag.ruleId, followupStep: opts.tag.step },
       });
     }
-    if (!opts.tag && result.sent) await this.followups?.plan?.(contact.id);
+    if (!opts.tag && result.sent) {
+      // Score first, then plan: a score-gated rule (the hot-lead ladder) would
+      // otherwise be chosen from the score this turn has just changed.
+      await this.scores.rescore(contact.id);
+      await this.followups?.plan?.(contact.id);
+    }
     return { decision, outbound: transport.captured.slice() };
   }
 
@@ -1115,6 +1128,36 @@ export class WhatsappBotService implements OnApplicationBootstrap, OnApplication
   private bookedSlot(contact: { stage: string; visitor: { custom: Prisma.JsonValue } }): string | null {
     const custom = (contact.visitor.custom ?? {}) as Record<string, unknown>;
     return contact.stage === 'counsellor' && typeof custom.preferredCallTime === 'string' ? custom.preferredCallTime : null;
+  }
+
+  /**
+   * Our last message offered to pass their request to an office. A plain "ok"
+   * after that is a yes, not a new topic.
+   */
+  private async awaitingDeptPass(contactId: string): Promise<boolean> {
+    const last = await this.prisma.whatsappMessage.findFirst({
+      where: { contactId, direction: 'out' },
+      orderBy: { createdAt: 'desc' },
+      select: { payload: true },
+    });
+    const options = ((last?.payload as { options?: Array<{ id?: string }> } | null)?.options ?? []) as Array<{ id?: string }>;
+    return options.some((o) => o.id === 'dept:pass');
+  }
+
+  /** How many of their most recent messages in a row we could not read. */
+  private async unclearRun(contactId: string): Promise<number> {
+    const recent = await this.prisma.whatsappMessage.findMany({
+      where: { contactId, direction: 'out', source: { in: ['bot', 'system'] } },
+      orderBy: { createdAt: 'desc' },
+      take: 3,
+      select: { payload: true, body: true },
+    });
+    let run = 0;
+    for (const m of recent) {
+      if (!/didn't get that|not sure what you mean|not following/i.test(m.body ?? '')) break;
+      run++;
+    }
+    return run;
   }
 
   /** True when the KNOWN block carries this fact, so the bot may say it. */

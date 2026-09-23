@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { Check, CheckCheck, Clock, List, MousePointerClick, RefreshCw, Send, SkipForward, UserPlus, X } from "lucide-react";
 
 import { Badge, Card, PageHeader, StatCard } from "@/components/ui-kit";
@@ -633,6 +634,7 @@ type Analytics = {
   options: { interactiveSent: number; taps: number; tapRate: number | null; aiSuggestionTaps: number; top: Array<{ optionId: string; title: string; taps: number }> };
   handoffs: Array<{ reason: string; contacts: number; booked: number }>;
   stages: Record<string, number>;
+  bands: Record<string, number>;
   contacts: Record<string, number>;
   readsByHourIst: Array<{ hour: number; reads: number }>;
 };
@@ -705,6 +707,21 @@ function Analytics() {
         </Card>
 
         <Card className="p-4">
+          <h3 className="font-semibold">How likely they are to convert</h3>
+          <p className="text-xs text-muted-foreground">
+            Everyone who replied in this window, by band. The score and its reasons are on each contact.
+          </p>
+          <ul className="mt-3 space-y-1.5 text-sm">
+            {(["hot", "warm", "cool", "cold", "unscored"] as const).map((band) => (
+              <li key={band} className="flex items-center justify-between gap-2">
+                <Badge tone={SCORE_TONES[band as keyof typeof SCORE_TONES] ?? "muted"}>{band}</Badge>
+                <span className="tabular-nums text-muted-foreground">{a?.bands?.[band] ?? 0}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+
+        <Card className="p-4">
           <h3 className="font-semibold">Handoffs by reason</h3>
           <ul className="mt-3 space-y-1.5 text-sm">
             {(a?.handoffs ?? []).map((h) => (
@@ -744,12 +761,19 @@ function Analytics() {
  * said, how fast they answer and how far their application has gone (the
  * server computes it; see whatsapp-score.ts).
  */
+const SCORE_TONES = {
+  hot: "danger-light",
+  warm: "warning-light",
+  cool: "primary-light",
+  cold: "muted",
+} as const;
+
 function ScoreBadge({ score, band }: { score: number | null; band: string | null }) {
   if (score === null || score === undefined) return <span className="text-muted-foreground">—</span>;
-  const tone = band === "hot" ? "danger-light" : band === "warm" ? "warning-light" : band === "cool" ? "primary-light" : "muted";
+  const tone = SCORE_TONES[(band ?? "cold") as keyof typeof SCORE_TONES] ?? "muted";
   return (
     <span className="inline-flex items-center gap-1.5">
-      <Badge tone={tone as never}>{band ?? "—"}</Badge>
+      <Badge tone={tone}>{band ?? "—"}</Badge>
       <span className="tabular-nums text-muted-foreground">{score}</span>
     </span>
   );
@@ -770,9 +794,12 @@ type ContactRow = {
   nextFollowupAt: string | null;
   optedOutAt: string | null;
   simulated: boolean;
+  /** The conversation behind this number, so a row can open its transcript. */
+  visitorId: string;
 };
 
 function Contacts() {
+  const navigate = useNavigate();
   const q = useQuery({
     queryKey: [QUERY_KEYS.GET_WHATSAPP_CONTACTS],
     queryFn: async () => (await Axios.get<ContactRow[]>("/api/v1/whatsapp/contacts", { params: { simulated: true } })).data,
@@ -786,7 +813,12 @@ function Contacts() {
         </thead>
         <tbody>
           {[...(q.data ?? [])].sort((a, b) => (b.score ?? -1) - (a.score ?? -1)).map((c) => (
-            <tr key={c.id} className="border-t border-border">
+            <tr
+              key={c.id}
+              className="cursor-pointer border-t border-border hover:bg-muted/50"
+              title="Open this conversation"
+              onClick={() => navigate({ to: "/conversations", search: { visitorId: c.visitorId } })}
+            >
               <td className="py-2 tabular-nums">+{c.waId} {c.simulated && <Badge tone="muted">sim</Badge>}</td>
               <td className="py-2">{c.name ?? "—"}</td>
               <td className="py-2">{c.courseInterest ?? "—"}</td>

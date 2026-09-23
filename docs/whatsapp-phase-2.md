@@ -97,6 +97,14 @@ Paying the application fee through the Acharya Admissions app takes Rs 500 off i
 - It is recomputed after every turn, after each follow-up and whenever the CRM status is re-read, and stored on the contact with the reasons behind it. The Contacts tab sorts by it and shows those reasons per contact; follow-up rules can require a band.
 - Nothing here is guessed by the model, so every point is explainable to a counsellor.
 
+### Guards that sit under the prompt
+
+Three style rules are enforced in code as well as asked for in the prompt, because a model slips on them often enough to be worth it, and because fixing them cannot change what a message says:
+
+- **Filler openers** ("Good move,", "No worries,", "Great question!") are cut from every reply on both channels (`stripFillerOpener` in `chat-agents/ui-block.util.ts`).
+- **A handoff to an office** never repeats the office's own phone or email, and never carries a question of Tara's own: the scripted block below her line says both, and two questions in one message is a complaint the owner already raised.
+- **An unclear message** twice in a row changes wording rather than repeating itself, and the second time offers a person instead of asking them to try again.
+
 ## 2. Clickable options
 
 - **Inside the 24h window: real reply buttons, verified on a phone 2026-09-22.** Mcube's `sendmessage` with `buttons: [{ id, title }]` (at most 3, 20 characters) arrives as WhatsApp reply buttons. A tap comes back as the button's title, which the bot matches to the option it offered.
@@ -169,4 +177,5 @@ Mcube reports Meta's rejections as HTTP 200 "success". The client only treats a 
 5. **Scale-out:** move follow-ups and per-contact ordering from in-process timers to a queue before running more than one backend instance.
 6. **Language:** Kannada and Hindi replies (the model already mirrors Hinglish); templates in those languages.
 7. **Application fee over the API:** `applicationForLead` reads the CRM database directly. When the CRM exposes its HTTP lookup, add the application and its fee to that response so production does not need database access.
-8. **Score tuning:** the weights in `whatsapp-score.ts` are a first cut. Once a few hundred leads have been through, compare the band at first contact with who actually applied, and move the weights to match.
+8. **Ranking claims:** the model still occasionally writes "high demand" or "a strong pick" about a branch, which the knowledge does not support. The prompt now bans it by example and the QA script fails on it; if it survives another round of testing it needs a scrub in code like the filler openers.
+9. **Score tuning:** the weights in `whatsapp-score.ts` are a first cut. Once a few hundred leads have been through, compare the band at first contact with who actually applied, and move the weights to match.

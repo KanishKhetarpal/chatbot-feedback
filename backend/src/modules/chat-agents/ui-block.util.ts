@@ -269,6 +269,23 @@ const tagRe = (tag: string) => new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'gi
 const openTagRe = (tag: string) => new RegExp(`<${tag}>[\\s\\S]*$`, 'i');
 
 /** Split a raw model reply into visible text and its validated attachments. */
+/**
+ * Openers the owner has banned ("Good move,", "Great question!", "Sure,").
+ *
+ * Both personas forbid them and both models still slip now and then, so they
+ * are cut here as well as asked for in the prompt. Removing a leading
+ * interjection cannot change what the sentence says, which is why this one
+ * thing is fixed in code while every other style rule stays in the prompt.
+ */
+const FILLER_OPENER =
+  /^(?:(?:good|great|nice|lovely|awesome|perfect|excellent|wonderful|sure|absolutely|certainly|definitely|of course|fair|no worries|got it|noted|okay|ok|alright|understood|cool|makes sense|that'?s fine|that'?s okay|that'?s great|good to know|nice to know|fair enough|fair point|no problem|fine|all right|right|glad you asked|thanks for asking)(?:\s+(?:pick|choice|question|one|call|field|stuff|then|move|news|idea|plan|start|point|thinking|to know))?(?:,?\s+(?:that'?s|it'?s) (?:fine|okay|ok|great)(?: at this stage| for now)?)?\s*[,.!:]+\s*)+/i;
+
+export function stripFillerOpener(text: string): string {
+  const cut = text.replace(FILLER_OPENER, '');
+  if (cut === text || cut.trim().length < 12) return text;
+  return cut.charAt(0).toUpperCase() + cut.slice(1);
+}
+
 export function extractReplyParts(reply: string): ReplyParts {
   let ui: UiBlock | null = null;
   let media: MediaOut[] = [];
@@ -346,7 +363,7 @@ export function extractReplyParts(reply: string): ReplyParts {
     });
   }
 
-  text = cleanVisible(text).replace(/\n{3,}/g, '\n\n').trim();
+  text = stripFillerOpener(cleanVisible(text).replace(/\n{3,}/g, '\n\n').trim());
 
   const shown = ui as UiBlock | null;
   const blocking = Boolean(shown && (shown.type === 'chips' || shown.type === 'select' || shown.type === 'form'));

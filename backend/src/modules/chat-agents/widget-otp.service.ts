@@ -99,14 +99,14 @@ export class WidgetOtpService {
       .includes(digits);
   }
 
-  private checkRateLimit(phone: string): void {
+  private checkRateLimit(key: string, max = this.MAX_REQUESTS): void {
     const now = Date.now();
-    const record = this.rate.get(phone);
+    const record = this.rate.get(key);
     if (!record || now - record.windowStart > this.RATE_WINDOW_MS) {
-      this.rate.set(phone, { count: 1, windowStart: now });
+      this.rate.set(key, { count: 1, windowStart: now });
       return;
     }
-    if (record.count >= this.MAX_REQUESTS) {
+    if (record.count >= max) {
       throw new HttpException(
         { message: 'Too many codes requested for this number. Try again in an hour.', error: 'otp_rate_limited' },
         HttpStatus.TOO_MANY_REQUESTS,
@@ -115,9 +115,17 @@ export class WidgetOtpService {
     record.count++;
   }
 
+  /**
+   * How many numbers one conversation may try to verify in an hour. Three
+   * codes each is the per-number cap; this stops a single visitor walking
+   * through a list of other people's numbers.
+   */
+  private readonly MAX_PER_VISITOR = 5;
+
   /** Issue a code and send it. Throws when it cannot be delivered at all. */
-  async request(e164: string): Promise<OtpRequestResult> {
+  async request(e164: string, visitorId?: string): Promise<OtpRequestResult> {
     this.checkRateLimit(e164);
+    if (visitorId) this.checkRateLimit(`visitor:${visitorId}`, this.MAX_PER_VISITOR);
     const code = process.env.WIDGET_OTP_BYPASS_CODE || String(Math.floor(100000 + Math.random() * 900000));
     this.store.set(e164, { code, expiresAt: Date.now() + this.TTL_MS, attempts: 0 });
 
@@ -125,6 +133,7 @@ export class WidgetOtpService {
       // The same guard the bot sends under: empty WHATSAPP_ALLOWED_NUMBERS means
       // nobody, so a development machine can never text a real applicant.
       this.logger.warn(`OTP for ${this.mask(e164)} blocked by WHATSAPP_ALLOWED_NUMBERS. Code: ${code}`);
+      this.refund(e164, visitorId);
       if (process.env.WIDGET_OTP_DEV_ECHO === 'true') {
         return { ok: true, channel: 'whatsapp', sentTo: this.mask(e164), expiresInSeconds: this.TTL_MS / 1000, devCode: code };
       }
@@ -162,6 +171,7 @@ export class WidgetOtpService {
       // rather than pretending a code is on its way; in development the code is
       // logged (and echoed when asked) so the flow stays testable.
       this.logger.warn(`OTP for ${this.mask(e164)} could not be sent (template "${template}"). Code: ${code}`);
+      this.refund(e164, visitorId);
       if (process.env.WIDGET_OTP_DEV_ECHO === 'true') {
         return { ok: true, channel: 'whatsapp', sentTo: this.mask(e164), expiresInSeconds: this.TTL_MS / 1000, devCode: code };
       }
@@ -174,6 +184,14 @@ export class WidgetOtpService {
 
     this.logger.log(`OTP sent to ${this.mask(e164)} via ${template}.`);
     return { ok: true, channel: 'whatsapp', sentTo: this.mask(e164), expiresInSeconds: this.TTL_MS / 1000 };
+  }
+
+  /** A code nobody could receive was not an attempt: give the allowance back. */
+  private refund(e164: string, visitorId?: string) {
+    for (const key of [e164, ...(visitorId ? [`visitor:${visitorId}`] : [])]) {
+      const record = this.rate.get(key);
+      if (record && record.count > 0) record.count--;
+    }
   }
 
   /** Consume a code. Throws with the reason when it does not check out. */

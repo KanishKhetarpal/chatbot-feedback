@@ -692,6 +692,8 @@ function OtpStep({
   onResend,
   onChangeNumber,
   devCode,
+  skip,
+  onSkip,
 }: {
   theme: WidgetTheme;
   sentTo: string;
@@ -701,6 +703,9 @@ function OtpStep({
   onResend: () => void;
   onChangeNumber: () => void;
   devCode?: string;
+  /** Label for the way out, when the form it belongs to has one. */
+  skip?: string;
+  onSkip?: () => void;
 }) {
   const look = lookFor(theme);
   const [code, setCode] = useState("");
@@ -759,6 +764,7 @@ function OtpStep({
           {wait > 0 ? `Resend in ${wait}s` : "Resend code"}
         </button>
       </div>
+      {skip && onSkip ? <SecondaryAction theme={theme} disabled={busy} label={skip} onClick={onSkip} /> : null}
     </div>
   );
 }
@@ -1247,6 +1253,10 @@ function FormView({ theme, block, active, disabled, onSend, onLead, onLocal, onS
               setOtp(null);
               setError(null);
             }}
+            // A skippable form stays skippable on the code screen: someone who
+            // cannot receive the code must not be stuck staring at it.
+            skip={block.skip && !block.gate ? block.skip : undefined}
+            onSkip={skip}
           />
         ) : (
           <>

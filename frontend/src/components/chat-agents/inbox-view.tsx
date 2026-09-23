@@ -603,6 +603,8 @@ function ThreadDetails({ thread }: { thread: InboxThreadDetail | undefined }) {
   const displayName = threadName({ visitorId: visitor.id, user: visitor.user, name: collected.name, phone: collected.phone });
   const contactRows = CONTACT_FIELDS.filter((field) => collected[field.key]);
   const extracted = thread.custom ?? visitor.custom ?? null;
+  // Set by the widget's OTP step: this number answered a code we sent it.
+  const phoneVerified = Boolean((extracted as Record<string, unknown> | null)?.phoneVerified);
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -672,7 +674,14 @@ function ThreadDetails({ thread }: { thread: InboxThreadDetail | undefined }) {
                   <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
                   <div className="min-w-0">
                     <p className="text-[10px] text-muted-foreground">{label}</p>
-                    <p className="truncate text-xs">{collected[key]}</p>
+                    <p className="truncate text-xs">
+                      {collected[key]}
+                      {key === "phone" && phoneVerified ? (
+                        <Badge tone="success-light" className="ml-1.5 align-middle">
+                          verified
+                        </Badge>
+                      ) : null}
+                    </p>
                   </div>
                 </li>
               ))}

@@ -26,7 +26,7 @@ export class WhatsappAnalyticsService {
     const to = params.to ?? new Date();
     const sim = params.includeSimulated ? Prisma.sql`` : Prisma.sql`AND c.simulated = false`;
 
-    const [funnel, bySource, readTimes, taps, interactiveSent, handoffs, stages, contacts, daily, hours] = await Promise.all([
+    const [funnel, bySource, readTimes, taps, interactiveSent, handoffs, stages, bands, contacts, daily, hours] = await Promise.all([
       this.prisma.$queryRaw<Array<Record<string, bigint>>>`
         SELECT count(*) FILTER (WHERE m."sentAt" IS NOT NULL) AS sent,
                count(*) FILTER (WHERE m."deliveredAt" IS NOT NULL) AS delivered,
@@ -81,6 +81,10 @@ export class WhatsappAnalyticsService {
       this.prisma.$queryRaw<Array<{ stage: string; contacts: bigint }>>`
         SELECT c.stage, count(*) AS contacts FROM whatsapp_contacts c
         WHERE c."createdAt" BETWEEN ${from} AND ${to} ${sim} GROUP BY 1`,
+      // How likely the people we are talking to are to convert (whatsapp-score.ts).
+      this.prisma.$queryRaw<Array<{ band: string; contacts: bigint }>>`
+        SELECT coalesce(c."scoreBand", 'unscored') AS band, count(*) AS contacts FROM whatsapp_contacts c
+        WHERE c."lastInboundAt" BETWEEN ${from} AND ${to} ${sim} GROUP BY 1`,
       this.prisma.$queryRaw<Array<Record<string, bigint>>>`
         SELECT count(*) AS total,
                count(*) FILTER (WHERE c."optedOutAt" IS NOT NULL) AS "optedOut",
@@ -141,6 +145,8 @@ export class WhatsappAnalyticsService {
       },
       handoffs: handoffs.map((h) => ({ reason: h.reason, contacts: n(h.contacts), booked: n(h.booked) })),
       stages: Object.fromEntries(stages.map((s) => [s.stage, n(s.contacts)])),
+      /** hot | warm | cool | cold | unscored → how many people, by their last reply. */
+      bands: Object.fromEntries(bands.map((b) => [b.band, n(b.contacts)])),
       contacts: Object.fromEntries(Object.entries(contacts[0] ?? {}).map(([k, v]) => [k, n(v)])),
       daily: daily.map((d) => ({ day: d.day, sent: n(d.sent), read: n(d.read), inbound: n(d.inbound) })),
       readsByHourIst: hours.map((h) => ({ hour: n(h.hour), reads: n(h.reads) })),
