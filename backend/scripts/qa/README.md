@@ -16,6 +16,11 @@ QA_PASS=<admin password> node backend/scripts/qa/whatsapp.mjs
 QA_PASS=<admin password> node backend/scripts/qa/whatsapp.mjs hesitating
 ```
 
+```bash
+# the claim scrub, on its own: no server, no model, no database
+node backend/scripts/qa/claims.mjs
+```
+
 Run the WhatsApp one from the repo root or `backend/`; it talks to the database
 through Prisma to write the CRM-derived facts onto simulated contacts (the
 simulator never reads the CRM itself) and to read back the conversion score.

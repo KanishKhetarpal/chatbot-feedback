@@ -396,6 +396,7 @@ export class WidgetService {
         `next=${/<next>/.test(result.text) ? 1 : 0} out=${result.usage.outputTokens}${dto.nudge ? ' (nudge)' : ''}`,
     );
     if (parts.rejected) this.logger.warn(`agent=${agent.id} dropped an invalid <ui> block: ${parts.reason}`);
+    for (const claim of parts.claimsRemoved) this.logger.warn(`agent=${agent.id} cut an unsupported claim: "${claim}"`);
     if (!dto.nudge) {
       const fallbackPhone = detectPhone(dto.message);
       if (fallbackPhone && !learned.mobile) learned.mobile = fallbackPhone;

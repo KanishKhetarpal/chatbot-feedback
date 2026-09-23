@@ -172,6 +172,8 @@ export interface ReplyParts {
   plan: PlanBlock | null;
   rejected: boolean;
   reason?: string;
+  /** Sentences dropped for claiming something the knowledge does not say. */
+  claimsRemoved: string[];
 }
 
 // ── Visitor-facing text hygiene ──────────────────────────────────────────────
@@ -278,12 +280,108 @@ const openTagRe = (tag: string) => new RegExp(`<${tag}>[\\s\\S]*$`, 'i');
  * thing is fixed in code while every other style rule stays in the prompt.
  */
 const FILLER_OPENER =
-  /^(?:(?:good|great|nice|lovely|awesome|perfect|excellent|wonderful|sure|absolutely|certainly|definitely|of course|fair|no worries|got it|noted|okay|ok|alright|understood|cool|makes sense|that'?s fine|that'?s okay|that'?s great|good to know|nice to know|fair enough|fair point|no problem|fine|all right|right|glad you asked|thanks for asking)(?:\s+(?:pick|choice|question|one|call|field|stuff|then|move|news|idea|plan|start|point|thinking|to know))?(?:,?\s+(?:that'?s|it'?s) (?:fine|okay|ok|great)(?: at this stage| for now)?)?\s*[,.!:]+\s*)+/i;
+  /^(?:(?:good|great|nice|lovely|awesome|perfect|excellent|wonderful|sure|absolutely|certainly|definitely|of course|fair|no worries|got it|noted|okay|ok|alright|understood|cool|makes sense|that'?s fine|that'?s okay|that'?s great|good to know|nice to know|fair enough|fair point|no problem|fine|all right|right|glad you asked|thanks for asking)(?:\s+(?:pick|choice|question|one|call|field|stuff|then|move|news|idea|plan|start|point|thinking|area|subject|branch|goal|shout|spot|to know))?(?:\s+to\s+[a-z]{2,12})?(?:,?\s+(?:that'?s|it'?s) (?:fine|okay|ok|great)(?: at this stage| for now)?)?(?:\s*[,.!:;]+\s*|\s+[-–—]+\s+))+/i;
 
 export function stripFillerOpener(text: string): string {
   const cut = text.replace(FILLER_OPENER, '');
   if (cut === text || cut.trim().length < 12) return text;
   return cut.charAt(0).toUpperCase() + cut.slice(1);
+}
+
+/**
+ * Claims about demand, popularity or scarcity that the knowledge never makes.
+ *
+ * "CSE is a strong pick, high demand and solid placement record" reads like a
+ * fact and is not one: nothing in the knowledge base ranks a branch or says how
+ * fast seats go. The owner has banned these outright, the prompt bans them by
+ * example, and both models still write one occasionally, so they are also cut
+ * here.
+ */
+const UNSUPPORTED_CLAIM = new RegExp(
+  [
+    // demand and popularity
+    'most sought[- ]after',
+    'sought[- ]after',
+    '(?:most|very|highly) popular',
+    '(?:high|highest|higher|huge|great|most|strong|strongest|growing|rising)\\s+demand',
+    '(?:most |highly |very )?in[- ]demand',
+    'demand is (?:high|highest|huge|growing|rising)',
+    'most enquir\\w+',
+    'most preferred',
+    'highly preferred',
+    'everyone wants',
+    'hot fav(?:ou)?rite',
+    // scarcity
+    'fills? up fast(?:est)?',
+    'fill(?:ing|s)? (?:up )?(?:fast|quickly|first)',
+    'going fast',
+    'limited seats?',
+    'seats? are filling',
+    'seats? (?:go|get taken) (?:fast|quickly)',
+    // ranking. "the best branch FOR YOU" is a fit, not a ranking, and stays.
+    '(?:the )?(?:best|top|number one) branch(?!\\s+(?:for|to suit))',
+  ].join('|'),
+  'i',
+);
+
+/**
+ * Saying a claim is not something we can make is the behaviour we want, not a
+ * claim: "I don't have data on which branch fills up fastest" keeps its words.
+ * Only a denial that comes BEFORE the phrase counts, so "CSE is in high demand,
+ * though I have no figures" is still cut.
+ */
+const DENIAL =
+  /(don'?t|do not|doesn'?t|does not|didn'?t|cannot|can'?t|won'?t|isn'?t|is not|aren'?t|are not|no|not|never|without|unable)/i;
+
+/** A fragment that cannot stand as a sentence once its neighbours are gone. */
+const DANGLING_START = /^(and|or|but|also|plus|with|under|at|in|on|for|from|which|that|so|then|because|since|as|especially|though|although)\b/i;
+const HAS_VERB =
+  /\b(is|are|was|were|has|have|had|can|could|will|would|offers?|gives?|runs?|covers?|includes?|holds?|takes?|comes?|sits?|starts?|needs?|accepts?|decides?|confirms?|sends?|works?|means?)\b/i;
+
+/**
+ * Remove the claims, keeping everything true that stood before them.
+ *
+ * A sentence is cut at the first clause that carries a claim, and everything
+ * from there on goes. Keeping the later clauses instead produced sentences that
+ * referred to something no longer there ("Exact seat-fill data isn't published,
+ * but that's the trend."), which reads worse than the claim did.
+ *
+ * The whole sentence goes when what survives could not stand on its own ("…,
+ * under VTU."), and if that would empty the message the original is kept: a
+ * reply that says nothing is worse than one that oversells. The QA suites
+ * (backend/scripts/qa) are what catch that case.
+ */
+export function scrubUnsupportedClaims(text: string): { text: string; removed: string[] } {
+  if (!UNSUPPORTED_CLAIM.test(text)) return { text, removed: [] };
+  const removed: string[] = [];
+
+  const lines = text.split('\n').map((line) => {
+    if (!UNSUPPORTED_CLAIM.test(line)) return line;
+    const sentences = line.split(/(?<=[.!?])\s+/);
+    const kept = sentences.map((sentence) => {
+      if (!UNSUPPORTED_CLAIM.test(sentence)) return sentence;
+      // A denial before the phrase means the bot is refusing to make the claim.
+      if (DENIAL.test(sentence.slice(0, sentence.search(UNSUPPORTED_CLAIM)))) return sentence;
+      removed.push(sentence.trim());
+      const clauses = sentence.split(/,\s*/);
+      const first = clauses.findIndex((clause) => UNSUPPORTED_CLAIM.test(clause));
+      const rebuilt = clauses
+        .slice(0, first)
+        .join(', ')
+        .replace(/\s+([.!?])/g, '$1')
+        .replace(/[,;:\s]+$/, '')
+        .trim();
+      const words = rebuilt.replace(/[^\w\s]/g, '').split(/\s+/).filter(Boolean);
+      const standsAlone = words.length >= 4 && HAS_VERB.test(rebuilt) && !DANGLING_START.test(rebuilt);
+      if (!standsAlone) return '';
+      return /[.!?]$/.test(rebuilt) ? rebuilt : `${rebuilt}.`;
+    });
+    return kept.filter(Boolean).join(' ').trim();
+  });
+
+  const scrubbed = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  if (!scrubbed) return { text, removed: [] };
+  return { text: scrubbed, removed };
 }
 
 export function extractReplyParts(reply: string): ReplyParts {
@@ -363,7 +461,15 @@ export function extractReplyParts(reply: string): ReplyParts {
     });
   }
 
-  text = stripFillerOpener(cleanVisible(text).replace(/\n{3,}/g, '\n\n').trim());
+  const claims = scrubUnsupportedClaims(stripFillerOpener(cleanVisible(text).replace(/\n{3,}/g, '\n\n').trim()));
+  text = claims.text;
+  // The follow-up bubble is the bot's own voice as well; `next` is not, being
+  // suggestions written for the visitor to say.
+  if (then) {
+    const thenClaims = scrubUnsupportedClaims(then);
+    then = thenClaims.text;
+    claims.removed.push(...thenClaims.removed);
+  }
 
   const shown = ui as UiBlock | null;
   const blocking = Boolean(shown && (shown.type === 'chips' || shown.type === 'select' || shown.type === 'form'));
@@ -394,7 +500,7 @@ export function extractReplyParts(reply: string): ReplyParts {
     next = [];
   }
 
-  return { text, ui, media, next, then, plan, rejected, reason };
+  return { text, ui, media, next, then, plan, rejected, reason, claimsRemoved: claims.removed };
 }
 
 /** Back-compat wrapper. */

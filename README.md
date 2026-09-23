@@ -129,6 +129,7 @@ pnpm db:seed:bots -- riya    # only files whose name contains "riya"
 ```bash
 node backend/scripts/qa/web.mjs <publicKey>
 QA_PASS=<admin password> node backend/scripts/qa/whatsapp.mjs
+node backend/scripts/qa/claims.mjs      # the claim scrub, no server needed
 ```
 
 **Rule-based bots.** A guided flow with `"noAi": true` never reaches the model: typed messages and idle follow-ups are refused, and training skips the cache warm-up. Answers may hold several wordings separated by a `~~~` line (one is picked at random); a node with no next chips returns the menu; `capture` appends a lead form after a random number of answers while no number has been left. Depth is the shortest number of taps from the menu (max 8).

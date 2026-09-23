@@ -102,6 +102,7 @@ Paying the application fee through the Acharya Admissions app takes Rs 500 off i
 Three style rules are enforced in code as well as asked for in the prompt, because a model slips on them often enough to be worth it, and because fixing them cannot change what a message says:
 
 - **Filler openers** ("Good move,", "No worries,", "Great question!") are cut from every reply on both channels (`stripFillerOpener` in `chat-agents/ui-block.util.ts`).
+- **Claims the knowledge does not make** about demand, popularity or seats filling ("CSE is in high demand", "one of the most sought-after branches", "seats fill up fast") are cut by `scrubUnsupportedClaims` in the same file. A sentence is cut at the clause that carries the claim and everything true before it is kept; the whole sentence goes when what is left could not stand alone, and a message that was nothing but the claim keeps its words rather than going blank. Denying the claim is left alone ("I don't have data on which branch fills up fastest"), and so is "the best branch **for you**", which is a fit rather than a ranking. Every cut is logged with the sentence, and `node backend/scripts/qa/claims.mjs` checks the rules without a server.
 - **A handoff to an office** never repeats the office's own phone or email, and never carries a question of Tara's own: the scripted block below her line says both, and two questions in one message is a complaint the owner already raised.
 - **An unclear message** twice in a row changes wording rather than repeating itself, and the second time offers a person instead of asking them to try again.
 
@@ -177,5 +178,4 @@ Mcube reports Meta's rejections as HTTP 200 "success". The client only treats a 
 5. **Scale-out:** move follow-ups and per-contact ordering from in-process timers to a queue before running more than one backend instance.
 6. **Language:** Kannada and Hindi replies (the model already mirrors Hinglish); templates in those languages.
 7. **Application fee over the API:** `applicationForLead` reads the CRM database directly. When the CRM exposes its HTTP lookup, add the application and its fee to that response so production does not need database access.
-8. **Ranking claims:** the model still occasionally writes "high demand" or "a strong pick" about a branch, which the knowledge does not support. The prompt now bans it by example and the QA script fails on it; if it survives another round of testing it needs a scrub in code like the filler openers.
-9. **Score tuning:** the weights in `whatsapp-score.ts` are a first cut. Once a few hundred leads have been through, compare the band at first contact with who actually applied, and move the weights to match.
+8. **Score tuning:** the weights in `whatsapp-score.ts` are a first cut. Once a few hundred leads have been through, compare the band at first contact with who actually applied, and move the weights to match.

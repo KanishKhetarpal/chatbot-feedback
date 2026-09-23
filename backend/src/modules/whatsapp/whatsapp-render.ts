@@ -1,4 +1,4 @@
-import { cleanVisible, stripFillerOpener } from '../chat-agents/ui-block.util';
+import { cleanVisible, scrubUnsupportedClaims, stripFillerOpener } from '../chat-agents/ui-block.util';
 import { WA_DOCUMENTS, WA_PHOTOS } from './whatsapp-media';
 import { extractFactsTag, type ExtractedFacts } from '../chat-agents/lead-extract.util';
 import { WA_LIMITS, type OutboundMessage, type WaOption } from './whatsapp.types';
@@ -26,6 +26,8 @@ export interface WhatsappReply {
   dept: string | null;
   facts: ExtractedFacts;
   styleNote: string | null;
+  /** Sentences dropped for claiming something the knowledge does not say. */
+  claimsRemoved: string[];
 }
 
 const tagRe = (tag: string) => new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'gi');
@@ -102,6 +104,7 @@ export function parseWhatsappReply(raw: string): WhatsappReply {
   let handoff: HandoffReason | null = null;
   let dept: string | null = null;
   let styleNote: string | null = null;
+  let claimsRemoved: string[] = [];
 
   let text = factFree
     .replace(tagRe('next'), (_m, body: string) => {
@@ -163,9 +166,11 @@ export function parseWhatsappReply(raw: string): WhatsappReply {
     // An unterminated tag from a cut-off reply.
     .replace(/<(next|media|doc|handoff|visitor-facts|style-note)\b[\s\S]*$/i, '');
 
-  text = reflowShort(stripFillerOpener(toWhatsappFormatting(cleanVisible(text)).replace(/\n{3,}/g, '\n\n').trim()));
+  const scrub = scrubUnsupportedClaims(stripFillerOpener(toWhatsappFormatting(cleanVisible(text)).replace(/\n{3,}/g, '\n\n').trim()));
+  claimsRemoved = scrub.removed;
+  text = reflowShort(scrub.text);
   if (handoff || styleNote) options = [];
-  return { text, options, media, documents, handoff, dept, facts, styleNote };
+  return { text, options, media, documents, handoff, dept, facts, styleNote, claimsRemoved };
 }
 
 /**

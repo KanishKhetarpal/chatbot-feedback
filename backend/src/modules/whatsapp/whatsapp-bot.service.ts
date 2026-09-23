@@ -759,6 +759,7 @@ export class WhatsappBotService implements OnApplicationBootstrap, OnApplication
     );
 
     const reply = parseWhatsappReply(result.text);
+    for (const claim of reply.claimsRemoved) this.logger.warn(`${contact.waId}: cut an unsupported claim: "${claim}"`);
     await this.persistFacts(contact.visitorId, reply.facts);
     if (reply.styleNote) {
       await this.saveStyleNote(reply.styleNote, message, contact.waId);
