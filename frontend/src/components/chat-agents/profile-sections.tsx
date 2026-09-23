@@ -495,6 +495,57 @@ export function LeadsSection({ control }: { control: AgentControl }) {
 
       <div className="space-y-4 border-t border-border pt-6">
         <SectionHeading
+          title="When the details form appears"
+          hint="Counted in bot replies and enforced by the API, so it holds even if someone calls the endpoint directly. 0 switches that ask off."
+        />
+        <div className="flex flex-wrap gap-6">
+          <FormField
+            control={control}
+            name="leadSoftAfter"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm text-muted-foreground">Skippable form after</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={20}
+                    className="h-9 max-w-28"
+                    value={field.value}
+                    onChange={(event) => field.onChange(Number(event.target.value))}
+                  />
+                </FormControl>
+                <p className="text-xs text-muted-foreground">replies. Comes with a “Not now”.</p>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={control}
+            name="leadGateAfter"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm text-muted-foreground">Compulsory from</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={20}
+                    className="h-9 max-w-28"
+                    value={field.value}
+                    onChange={(event) => field.onChange(Number(event.target.value))}
+                  />
+                </FormControl>
+                <p className="text-xs text-muted-foreground">replies. Nothing is answered without a number.</p>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-4 border-t border-border pt-6">
+        <SectionHeading
           title="Handoff"
           hint="When the chatbot should stop trying and put a person in front of the visitor."
         />

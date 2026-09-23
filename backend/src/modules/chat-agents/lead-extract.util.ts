@@ -32,6 +32,7 @@ export const FACT_KEYS = [
   'educationLevel',
   'preferredCallTime',
   'parentOrStudent',
+  'audience',
 ] as const;
 export type FactKey = (typeof FACT_KEYS)[number];
 

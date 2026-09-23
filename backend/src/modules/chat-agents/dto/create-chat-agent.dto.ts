@@ -163,6 +163,34 @@ export class CreateChatAgentDto {
   leadFields?: Array<(typeof LEAD_FIELDS)[number]>;
 
   @ApiPropertyOptional({
+    default: 3,
+    minimum: 0,
+    maximum: 20,
+    description:
+      'After this many bot replies the server adds a skippable name + number form. 0 switches it off. Enforced in the API, not the widget.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(20)
+  leadSoftAfter?: number;
+
+  @ApiPropertyOptional({
+    default: 6,
+    minimum: 0,
+    maximum: 20,
+    description:
+      'From this many bot replies the form is compulsory: nothing is answered until a number is left. 0 switches the gate off. Enforced in the API, not the widget.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(20)
+  leadGateAfter?: number;
+
+  @ApiPropertyOptional({
     default: true,
     description:
       'When true, the agent asks qualifying questions (programme, year, level, city…) as a counsellor would, weaved into its answers. False = pure Q&A behaviour.',

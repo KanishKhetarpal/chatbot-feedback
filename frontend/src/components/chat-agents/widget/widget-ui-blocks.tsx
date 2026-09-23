@@ -14,7 +14,7 @@
  * is on the record even if the model forgets to tag it.
  */
 
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -38,6 +38,7 @@ import {
 import { CORNER_RADIUS, isLightHex } from "@/lib/chat-agent-constants";
 import type { UiBlock, UiCard, UiCardItem, UiChips, UiFits, UiForm, UiGuide, UiMedia, UiProgress, UiSelect } from "@/lib/widget-ui";
 import { iconFor } from "@/lib/widget-icons";
+import { getCachedCountries, getDialCodeForCountry, getNationalNumberLength } from "@/lib/phone-countries";
 import type { WidgetTheme } from "@/types/chat-agent-types";
 
 export type UiHandlers = {
@@ -51,6 +52,14 @@ export type UiHandlers = {
   onTypeOwn?: () => void;
   /** Rule-based bots: a form's "not now" just closes it (the menu stays). */
   onSkipLocal?: () => void;
+  /**
+   * Send a 6-digit code to this number on WhatsApp. Resolves with how the
+   * number was masked, or null when this environment cannot send at all, in
+   * which case the form falls back to storing the number unverified.
+   */
+  onRequestOtp?: (phone: string, country: string) => Promise<{ sentTo: string; devCode?: string } | null>;
+  /** Check the code. The number is stored as the lead, marked verified, on success. */
+  onVerifyOtp?: (phone: string, country: string, code: string, name?: string, email?: string) => Promise<void>;
 };
 
 const OWN_QUESTION = "Ask my own question";
@@ -587,35 +596,226 @@ function initials(text: string) {
 
 // ── lead fields (shared by guide unlock and form) ────────────────────────────
 
-function validPhone(phone: string) {
-  const digits = phone.replace(/\D/g, "");
-  return digits.length >= 10 && digits.length <= 15;
+/**
+ * The number, in two parts: the country they picked and the digits they typed.
+ *
+ * A number is only complete when its length matches what that country actually
+ * uses (`getNationalNumberLength`), so a ten-digit Indian number is required in
+ * full while a nine-digit Australian one is accepted as it is. The value that
+ * leaves this component is always E.164 (`+919148089847`), which is what the
+ * verification endpoint and WhatsApp both want.
+ */
+const DEFAULT_COUNTRY = "IN";
+
+function phoneDigits(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+/** Null when the number is usable, otherwise what to tell them. */
+function phoneProblem(country: string, national: string): string | null {
+  const digits = phoneDigits(national);
+  if (!digits) return "Enter your mobile number.";
+  const { min, max } = getNationalNumberLength(country);
+  if (digits.length < min) return min === max ? `That number needs ${min} digits.` : `That number needs at least ${min} digits.`;
+  if (digits.length > max) return min === max ? `That number has ${max} digits.` : `That number has at most ${max} digits.`;
+  return null;
+}
+
+function toE164(country: string, national: string): string {
+  const dial = getDialCodeForCountry(country) ?? "+91";
+  return `${dial}${phoneDigits(national)}`;
+}
+
+function PhoneField({
+  theme,
+  country,
+  onCountry,
+  value,
+  onValue,
+  disabled,
+}: {
+  theme: WidgetTheme;
+  country: string;
+  onCountry: (code: string) => void;
+  value: string;
+  onValue: (value: string) => void;
+  disabled?: boolean;
+}) {
+  const look = lookFor(theme);
+  const countries = getCachedCountries();
+  const { max } = getNationalNumberLength(country);
+  return (
+    <div className="flex gap-1.5">
+      <select
+        value={country}
+        disabled={disabled}
+        onChange={(e) => onCountry(e.target.value)}
+        aria-label="Country code"
+        className="w-[92px] shrink-0 px-1.5 py-2 text-[13px] outline-none"
+        style={look.input}
+      >
+        {countries.map((c) => (
+          <option key={c.code} value={c.code}>
+            {c.code} {c.dialCode}
+          </option>
+        ))}
+      </select>
+      <input
+        value={value}
+        onChange={(e) => onValue(phoneDigits(e.target.value).slice(0, max))}
+        placeholder={max === 10 ? "10-digit number" : `${max}-digit number`}
+        autoComplete="tel-national"
+        inputMode="numeric"
+        maxLength={max}
+        disabled={disabled}
+        className="w-full px-2.5 py-2 text-[13px] outline-none"
+        style={look.input}
+      />
+    </div>
+  );
+}
+
+/**
+ * The code screen.
+ *
+ * Shown after the number is submitted and before anything is stored: the number
+ * on a lead is only worth something if a counsellor can actually reach it. Six
+ * digits, ten minutes, and a resend that stays disabled for half a minute so a
+ * second code cannot be fired off by reflex.
+ */
+function OtpStep({
+  theme,
+  sentTo,
+  busy,
+  error,
+  onVerify,
+  onResend,
+  onChangeNumber,
+  devCode,
+}: {
+  theme: WidgetTheme;
+  sentTo: string;
+  busy: boolean;
+  error: string | null;
+  onVerify: (code: string) => void;
+  onResend: () => void;
+  onChangeNumber: () => void;
+  devCode?: string;
+}) {
+  const look = lookFor(theme);
+  const [code, setCode] = useState("");
+  const [wait, setWait] = useState(30);
+
+  useEffect(() => {
+    if (wait <= 0) return;
+    const timer = setTimeout(() => setWait((w) => w - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [wait]);
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      <p className="text-[12px] leading-relaxed" style={{ color: theme.mutedText }}>
+        We sent a 6-digit code to <span style={{ color: theme.backgroundText }}>{sentTo}</span> on WhatsApp.
+        {devCode ? <span className="ml-1 opacity-70">(dev: {devCode})</span> : null}
+      </p>
+      <Field label="Verification code" theme={theme}>
+        <input
+          value={code}
+          onChange={(e) => setCode(phoneDigits(e.target.value).slice(0, 6))}
+          placeholder="6-digit code"
+          autoComplete="one-time-code"
+          inputMode="numeric"
+          maxLength={6}
+          disabled={busy}
+          className="w-full px-2.5 py-2 text-[15px] tracking-[0.3em] outline-none"
+          style={look.input}
+        />
+      </Field>
+      {error ? <p className="text-[11px] text-red-500">{error}</p> : null}
+      <button
+        type="button"
+        disabled={busy || code.length < 4}
+        onClick={() => onVerify(code)}
+        className="flex w-full items-center justify-center gap-1.5 py-2.5 text-[13px] font-semibold disabled:opacity-50"
+        style={look.primaryBtn}
+      >
+        {busy ? <Loader2 className="size-3.5 animate-spin" /> : null}
+        Verify and continue
+      </button>
+      <div className="flex items-center justify-between text-[11px]">
+        <button type="button" onClick={onChangeNumber} disabled={busy} className="underline underline-offset-2" style={{ color: theme.mutedText }}>
+          Change number
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setWait(30);
+            onResend();
+          }}
+          disabled={busy || wait > 0}
+          className="underline underline-offset-2 disabled:no-underline disabled:opacity-60"
+          style={{ color: wait > 0 ? theme.mutedText : theme.primary }}
+        >
+          {wait > 0 ? `Resend in ${wait}s` : "Resend code"}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // ── guide ────────────────────────────────────────────────────────────────────
 
-function GuideView({ theme, block, active, disabled, onSend, onLead }: Props & { block: UiGuide }) {
+function GuideView({ theme, block, active, disabled, onSend, onLead, onRequestOtp, onVerifyOtp }: Props & { block: UiGuide }) {
   const look = lookFor(theme);
   const [unlocking, setUnlocking] = useState(false);
   const [name, setName] = useState(block.for ?? "");
+  const [country, setCountry] = useState(DEFAULT_COUNTRY);
   const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [open, setOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [otp, setOtp] = useState<{ sentTo: string; devCode?: string } | null>(null);
+
+  /** The guide is sent to a number we know reaches them, so it is verified first. */
+  async function deliver() {
+    setSent(true);
+    await onSend(`Yes, please send my guide. I'm ${name.trim()}, WhatsApp ${toE164(country, phone)}.`);
+  }
 
   async function unlock() {
     if (name.trim().length < 2) return setError("Please enter your name.");
-    if (!validPhone(phone)) return setError("Enter a valid 10-digit mobile number.");
+    const problem = phoneProblem(country, phone);
+    if (problem) return setError(problem);
     setBusy(true);
     setError(null);
     try {
-      await onLead(name.trim(), phone.trim());
-      setSent(true);
-      await onSend(`Yes, please send my guide. I'm ${name.trim()}, WhatsApp ${phone.trim()}.`);
+      if (onRequestOtp) {
+        const code = await onRequestOtp(toE164(country, phone), country);
+        if (code) {
+          setOtp(code);
+          return;
+        }
+      }
+      await onLead(name.trim(), toE164(country, phone));
+      await deliver();
     } catch {
       setError("Could not send that. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verify(code: string) {
+    if (!onVerifyOtp) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onVerifyOtp(toE164(country, phone), country, code, name.trim() || undefined);
+      await deliver();
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : "That code is not right.");
     } finally {
       setBusy(false);
     }
@@ -681,41 +881,48 @@ function GuideView({ theme, block, active, disabled, onSend, onLead }: Props & {
             active && !sent ? (
               unlocking ? (
                 <div className="mt-3 flex flex-col gap-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Your name"
-                      autoComplete="name"
-                      maxLength={80}
-                      className="w-full px-2.5 py-2 text-[13px] outline-none"
-                      style={look.input}
+                  {otp ? (
+                    <OtpStep
+                      theme={theme}
+                      sentTo={otp.sentTo}
+                      devCode={otp.devCode}
+                      busy={busy}
+                      error={error}
+                      onVerify={(code) => void verify(code)}
+                      onResend={() => void unlock()}
+                      onChangeNumber={() => {
+                        setOtp(null);
+                        setError(null);
+                      }}
                     />
-                    <input
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="WhatsApp number"
-                      autoComplete="tel"
-                      inputMode="tel"
-                      maxLength={20}
-                      className="w-full px-2.5 py-2 text-[13px] outline-none"
-                      style={look.input}
-                    />
-                  </div>
-                  {error ? <p className="text-[11px] text-red-500">{error}</p> : null}
-                  <button
-                    type="button"
-                    disabled={busy || disabled}
-                    onClick={() => void unlock()}
-                    className="flex items-center justify-center gap-1.5 py-2.5 text-[13px] font-semibold disabled:opacity-50"
-                    style={look.primaryBtn}
-                  >
-                    {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Lock className="size-3.5" />}
-                    Unlock my guide
-                  </button>
-                  <p className="text-center text-[10.5px]" style={{ color: theme.mutedText }}>
-                    Used only to send this guide. Say stop anytime.
-                  </p>
+                  ) : (
+                    <>
+                      <input
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Your name"
+                        autoComplete="name"
+                        maxLength={80}
+                        className="w-full px-2.5 py-2 text-[13px] outline-none"
+                        style={look.input}
+                      />
+                      <PhoneField theme={theme} country={country} onCountry={setCountry} value={phone} onValue={setPhone} disabled={busy} />
+                      {error ? <p className="text-[11px] text-red-500">{error}</p> : null}
+                      <button
+                        type="button"
+                        disabled={busy || disabled}
+                        onClick={() => void unlock()}
+                        className="flex items-center justify-center gap-1.5 py-2.5 text-[13px] font-semibold disabled:opacity-50"
+                        style={look.primaryBtn}
+                      >
+                        {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Lock className="size-3.5" />}
+                        Unlock my guide
+                      </button>
+                      <p className="text-center text-[10.5px]" style={{ color: theme.mutedText }}>
+                        Used only to send this guide. Say stop anytime.
+                      </p>
+                    </>
+                  )}
                 </div>
               ) : (
                 <button
@@ -876,10 +1083,11 @@ export async function buildGuidePdf(block: UiGuide, theme: WidgetTheme) {
 
 const RELATIONS = ["I'm the student", "Parent", "Guardian / relative"];
 
-function FormView({ theme, block, active, disabled, onSend, onLead, onLocal, onSkipLocal }: Props & { block: UiForm }) {
+function FormView({ theme, block, active, disabled, onSend, onLead, onLocal, onSkipLocal, onRequestOtp, onVerifyOtp }: Props & { block: UiForm }) {
   const look = lookFor(theme);
   const has = (f: UiForm["fields"][number]) => block.fields.includes(f);
   const [name, setName] = useState("");
+  const [country, setCountry] = useState(DEFAULT_COUNTRY);
   const [phone, setPhone] = useState("");
   const [slot, setSlot] = useState("");
   const [relation, setRelation] = useState("");
@@ -890,6 +1098,8 @@ function FormView({ theme, block, active, disabled, onSend, onLead, onLocal, onS
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [skipped, setSkipped] = useState(false);
+  // The code screen: shown between "send" and anything being stored.
+  const [otp, setOtp] = useState<{ sentTo: string; devCode?: string } | null>(null);
   const HeadIcon = iconFor(block.icon) ?? CalendarCheck;
 
   if (skipped) return <Closed theme={theme} label="Skipped for now" />;
@@ -902,9 +1112,38 @@ function FormView({ theme, block, active, disabled, onSend, onLead, onLocal, onS
     else void onSend(block.skip ?? "Not now, let's keep going");
   }
 
+  /** What the visitor's own message says once everything is in. */
+  function summary() {
+    return [
+      has("name") ? `Name: ${name.trim()}` : null,
+      has("relation") ? relation : null,
+      ...(block.selects ?? []).map((f, i) => `${f.label}: ${extra[i]}`),
+      has("phone") ? `Mobile: ${toE164(country, phone)}` : null,
+      has("email") ? `Email: ${email.trim()}` : null,
+      has("slot") && slot ? `Call me: ${slot}` : null,
+      has("visitDay") && visitDay ? `Visit: ${visitDay}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  /** The last step, once the number is settled: hand the details to the chat. */
+  async function finish() {
+    setDone(true);
+    if (block.local && onLocal) {
+      const first = name.trim().split(/\s+/)[0] || "there";
+      onLocal(summary(), (block.done ?? "Thanks, {name}. A counsellor will be in touch shortly.").replace(/\{name\}/g, first));
+    } else {
+      await onSend(summary());
+    }
+  }
+
   async function submit() {
     if (has("name") && name.trim().length < 2) return setError("Please enter a name.");
-    if (has("phone") && !validPhone(phone)) return setError("Enter a valid 10-digit mobile number.");
+    if (has("phone")) {
+      const problem = phoneProblem(country, phone);
+      if (problem) return setError(problem);
+    }
     if (has("slot") && block.slots?.length && !slot) return setError("Pick a time.");
     if (has("visitDay") && block.visitDays?.length && !visitDay) return setError("Pick a day.");
     if (has("relation") && !relation) return setError("Tell us who is enquiring.");
@@ -914,26 +1153,49 @@ function FormView({ theme, block, active, disabled, onSend, onLead, onLocal, onS
     setBusy(true);
     setError(null);
     try {
-      if (has("phone")) await onLead(name.trim() || "Visitor", phone.trim(), has("email") ? email.trim() : undefined);
-      const parts = [
-        has("name") ? `Name: ${name.trim()}` : null,
-        has("relation") ? relation : null,
-        ...(block.selects ?? []).map((f, i) => `${f.label}: ${extra[i]}`),
-        has("phone") ? `Mobile: ${phone.trim()}` : null,
-        has("email") ? `Email: ${email.trim()}` : null,
-        has("slot") && slot ? `Call me: ${slot}` : null,
-        has("visitDay") && visitDay ? `Visit: ${visitDay}` : null,
-      ].filter(Boolean);
-      setDone(true);
-      if (block.local && onLocal) {
-        const first = name.trim().split(/\s+/)[0] || "there";
-        onLocal(parts.join(" · "), (block.done ?? "Thanks, {name}. A counsellor will be in touch shortly.").replace(/\{name\}/g, first));
-      } else {
-        await onSend(parts.join(" · "));
+      // A number is verified before it is stored. When verification cannot run
+      // at all (no WhatsApp from this environment), the number is still saved:
+      // losing the lead would be worse than storing it unconfirmed.
+      if (has("phone") && onRequestOtp) {
+        const sent = await onRequestOtp(toE164(country, phone), country);
+        if (sent) {
+          setOtp(sent);
+          return;
+        }
       }
+      if (has("phone")) await onLead(name.trim() || "Visitor", toE164(country, phone), has("email") ? email.trim() : undefined);
+      await finish();
     } catch {
       setDone(false);
       setError("Could not send that. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verify(code: string) {
+    if (!onVerifyOtp) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onVerifyOtp(toE164(country, phone), country, code, name.trim() || undefined, has("email") ? email.trim() : undefined);
+      await finish();
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : "That code is not right.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resend() {
+    if (!onRequestOtp) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const sent = await onRequestOtp(toE164(country, phone), country);
+      if (sent) setOtp(sent);
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : "Could not send another code.");
     } finally {
       setBusy(false);
     }
@@ -964,51 +1226,69 @@ function FormView({ theme, block, active, disabled, onSend, onLead, onLocal, onS
             <HeadIcon className="size-4" />
           </span>
           <div>
-            <p className="text-[13.5px] leading-snug font-semibold tracking-tight">{block.title}</p>
-            {block.subtitle ? (
+            <p className="text-[13.5px] leading-snug font-semibold tracking-tight">{otp ? "Confirm your number" : block.title}</p>
+            {block.subtitle && !otp ? (
               <p className="mt-0.5 text-[11.5px] leading-relaxed" style={{ color: theme.mutedText }}>
                 {block.subtitle}
               </p>
             ) : null}
           </div>
         </div>
-        <div className="flex flex-col gap-2.5">
-          {has("relation") ? <Field label="Who is enquiring" theme={theme}>{select(relation, setRelation, RELATIONS, "Choose…")}</Field> : null}
-          {has("name") ? (
-            <Field label="Name" theme={theme}>
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" autoComplete="name" maxLength={80} disabled={busy} className="w-full px-2.5 py-2 text-[13px] outline-none" style={look.input} />
-            </Field>
-          ) : null}
-          {has("phone") ? (
-            <Field label="Mobile / WhatsApp" theme={theme}>
-              <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="10-digit number" autoComplete="tel" inputMode="tel" maxLength={20} disabled={busy} className="w-full px-2.5 py-2 text-[13px] outline-none" style={look.input} />
-            </Field>
-          ) : null}
-          {(block.selects ?? []).map((f, i) => (
-            <Field key={f.label} label={f.label} theme={theme}>
-              {select(extra[i] ?? "", (v) => setExtra((xs) => xs.map((x, j) => (j === i ? v : x))), f.options, "Choose…")}
-            </Field>
-          ))}
-          {has("email") ? (
-            <Field label="Email" theme={theme}>
-              <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" inputMode="email" maxLength={120} disabled={busy} className="w-full px-2.5 py-2 text-[13px] outline-none" style={look.input} />
-            </Field>
-          ) : null}
-          {has("slot") && block.slots?.length ? <Field label={block.icon === "video" ? "Preferred slot" : "Best time to call"} theme={theme}>{select(slot, setSlot, block.slots, "Pick a time…")}</Field> : null}
-          {has("visitDay") && block.visitDays?.length ? <Field label="Visit day" theme={theme}>{select(visitDay, setVisitDay, block.visitDays, "Pick a day…")}</Field> : null}
-        </div>
-        {error ? <p className="mt-2 text-[11px] text-red-500">{error}</p> : null}
-        <button
-          type="button"
-          disabled={busy || disabled}
-          onClick={() => void submit()}
-          className="mt-3 flex w-full items-center justify-center gap-1.5 py-2.5 text-[13px] font-semibold disabled:opacity-50"
-          style={look.primaryBtn}
-        >
-          {busy ? <Loader2 className="size-3.5 animate-spin" /> : null}
-          {block.submit ?? "Send"}
-        </button>
-        {block.skip && !block.gate ? <SecondaryAction theme={theme} disabled={busy || disabled} label={block.skip} onClick={skip} /> : null}
+        {otp ? (
+          <OtpStep
+            theme={theme}
+            sentTo={otp.sentTo}
+            devCode={otp.devCode}
+            busy={busy}
+            error={error}
+            onVerify={(code) => void verify(code)}
+            onResend={() => void resend()}
+            onChangeNumber={() => {
+              setOtp(null);
+              setError(null);
+            }}
+          />
+        ) : (
+          <>
+            <div className="flex flex-col gap-2.5">
+              {has("relation") ? <Field label="Who is enquiring" theme={theme}>{select(relation, setRelation, RELATIONS, "Choose…")}</Field> : null}
+              {has("name") ? (
+                <Field label="Name" theme={theme}>
+                  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" autoComplete="name" maxLength={80} disabled={busy} className="w-full px-2.5 py-2 text-[13px] outline-none" style={look.input} />
+                </Field>
+              ) : null}
+              {has("phone") ? (
+                <Field label="Mobile / WhatsApp" theme={theme}>
+                  <PhoneField theme={theme} country={country} onCountry={setCountry} value={phone} onValue={setPhone} disabled={busy} />
+                </Field>
+              ) : null}
+              {(block.selects ?? []).map((f, i) => (
+                <Field key={f.label} label={f.label} theme={theme}>
+                  {select(extra[i] ?? "", (v) => setExtra((xs) => xs.map((x, j) => (j === i ? v : x))), f.options, "Choose…")}
+                </Field>
+              ))}
+              {has("email") ? (
+                <Field label="Email" theme={theme}>
+                  <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" inputMode="email" maxLength={120} disabled={busy} className="w-full px-2.5 py-2 text-[13px] outline-none" style={look.input} />
+                </Field>
+              ) : null}
+              {has("slot") && block.slots?.length ? <Field label={block.icon === "video" ? "Preferred slot" : "Best time to call"} theme={theme}>{select(slot, setSlot, block.slots, "Pick a time…")}</Field> : null}
+              {has("visitDay") && block.visitDays?.length ? <Field label="Visit day" theme={theme}>{select(visitDay, setVisitDay, block.visitDays, "Pick a day…")}</Field> : null}
+            </div>
+            {error ? <p className="mt-2 text-[11px] text-red-500">{error}</p> : null}
+            <button
+              type="button"
+              disabled={busy || disabled}
+              onClick={() => void submit()}
+              className="mt-3 flex w-full items-center justify-center gap-1.5 py-2.5 text-[13px] font-semibold disabled:opacity-50"
+              style={look.primaryBtn}
+            >
+              {busy ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              {block.submit ?? "Send"}
+            </button>
+            {block.skip && !block.gate ? <SecondaryAction theme={theme} disabled={busy || disabled} label={block.skip} onClick={skip} /> : null}
+          </>
+        )}
         {block.note ? (
           <p className="mt-2 text-center text-[10.5px]" style={{ color: theme.mutedText }}>
             {block.note}

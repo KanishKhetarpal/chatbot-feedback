@@ -75,6 +75,13 @@ model ChatAgent {
   leadCapture String   @default("never") // never | before_chat | after_first_reply
   leadFields  String[] @default(["phone"])
 
+  /// The server-enforced details ask. After `leadSoftAfter` bot replies a
+  /// skippable name + number form arrives; from `leadGateAfter` it is
+  /// compulsory and nothing is answered until a number is left. 0 switches
+  /// that ask off. Enforced in the API, never in the widget.
+  leadSoftAfter Int @default(3)
+  leadGateAfter Int @default(6)
+
   /// When true the persona also asks one qualifying question per turn.
   qualificationEnabled Boolean @default(true)
 
@@ -103,6 +110,7 @@ model ChatAgent {
   knowledgeSources ChatAgentKnowledgeSource[]
   packs            ChatAgentKnowledgePack[]
   visitors         ChatWidgetVisitor[]
+  whatsappContacts WhatsappContact[]
 
   @@index([createdByUserId])
   @@index([status])
@@ -233,6 +241,9 @@ model ChatWidgetVisitor {
   fieldSources Json?
   handoffAt    DateTime?
 
+  /// `web` (share link, widget, in-app chat) or `whatsapp`.
+  channel String @default("web")
+
   currentNodeId      String?
   guidedFlowExitedAt DateTime?
 
@@ -252,6 +263,7 @@ model ChatWidgetVisitor {
   user       User?               @relation("VisitorUser", fields: [userId], references: [id], onDelete: SetNull)
   reviewedBy User?               @relation("VisitorReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
   messages   ChatWidgetMessage[]
+  whatsapp   WhatsappContact?
 
   @@index([agentId])
   @@index([agentId, lastSeenAt])
@@ -344,4 +356,174 @@ model AiUsageLog {
   @@index([agentId, createdAt])
   @@index([model])
   @@map("ai_usage_logs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WhatsApp (phase 2): one bot on the Acharya number, through Mcube
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// One person on WhatsApp, keyed by their number. The transcript itself lives on
+/// the linked ChatWidgetVisitor (channel = whatsapp), so the review inbox,
+/// feedback and fact capture work unchanged; this row holds what only WhatsApp has.
+model WhatsappContact {
+  id          String  @id @default(uuid())
+  /// E.164 without the plus, exactly as Meta names it ('919148089847').
+  waId        String  @unique
+  profileName String?
+  agentId     String
+  visitorId   String  @unique
+
+  lastInboundAt  DateTime?
+  lastOutboundAt DateTime?
+
+  /// new | engaged | qualified | counsellor | applied | lost
+  stage String @default("new")
+
+  /// A counsellor owns the thread: the bot stays quiet until this passes.
+  botPausedUntil DateTime?
+  handoffAt      DateTime?
+  /// fees | out_of_scope | asked_for_human | callback | …
+  handoffReason  String?
+
+  optedOutAt DateTime?
+
+  /// Created by the in-app simulator: never sent to a real phone, left out of analytics by default.
+  simulated Boolean @default(false)
+
+  /// The options last offered, so "2" or a tapped id resolves to what was shown.
+  pendingOptions Json?
+
+  /// Conversion likelihood, 0 to 100, with the reasons that made it (see
+  /// whatsapp-score.ts). Recomputed after every turn, follow-up and CRM read.
+  score        Int?
+  /// hot | warm | cool | cold, from the same computation.
+  scoreBand    String?
+  scoreSignals Json?
+  scoredAt     DateTime?
+
+  /// Follow-up ladder: how many steps of the current rule were used, and when the next one is due.
+  followupCount  Int       @default(0)
+  nextFollowupAt DateTime?
+  /// The rule the ladder is on, the stage it was chosen for, and the moment its delays count from.
+  followupRuleId   String?
+  followupStage    String?
+  followupAnchorAt DateTime?
+  /// When the CRM status was last re-read (it changes outside this app).
+  crmCheckedAt     DateTime?
+
+  /// Only one process answers a person at a time: a lease, taken with a conditional update.
+  lockedUntil DateTime?
+  lockToken   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agent    ChatAgent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  visitor  ChatWidgetVisitor @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  messages WhatsappMessage[]
+
+  @@index([agentId, lastInboundAt])
+  @@index([nextFollowupAt])
+  @@index([score])
+  @@map("whatsapp_contacts")
+}
+
+/// Every WhatsApp message in or out, with its delivery ladder.
+model WhatsappMessage {
+  id        String @id @default(uuid())
+  contactId String
+
+  /// in | out
+  direction String
+  /// text | buttons | list | image | template | interactive_reply | button_reply | media | …
+  kind      String
+  body      String? @db.Text
+  /// What was sent (options, template params) or received (raw interactive reply).
+  payload   Json?
+
+  /// bot | followup | handoff | system | user
+  source String @default("bot")
+
+  /// wamid from Meta. Unique per provider: a redelivered webhook is a no-op.
+  provider          String  @default("mcube")
+  providerMessageId String?
+
+  /// Inbound only: the outbound message this one answers (Meta `context.id`).
+  inReplyToId String?
+  /// Inbound taps: which option id and title were chosen.
+  optionId    String?
+  optionTitle String?
+
+  /// queued | sent | delivered | read | failed (outbound). received (inbound).
+  status      String    @default("queued")
+  /// queued 1 < sent 2 < delivered 3 < read 4 < failed 5, so a late receipt never walks back.
+  statusRank  Int       @default(1)
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+  failedAt    DateTime?
+  error       String?   @db.Text
+
+  /// The transcript row this message came from or went to.
+  chatMessageId String?
+
+  /// Follow-ups: which rule and step sent this, for per-step read and reply rates.
+  followupRuleId String?
+  followupStep   Int?
+
+  /// Inbound only. claimedAt: a turn took it. handledAt: that turn finished (answered, or
+  /// deliberately left: stale, paused, opted out). Unhandled + unclaimed = still to answer.
+  claimedAt DateTime?
+  handledAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  contact WhatsappContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerMessageId])
+  @@index([contactId, createdAt])
+  @@index([direction, createdAt])
+  @@index([inReplyToId])
+  @@index([direction, handledAt])
+  @@map("whatsapp_messages")
+}
+
+/// How the owner wants the WhatsApp bot to write, sent from a coach number in
+/// WhatsApp itself ("feedback: shorter replies"). Active notes go into the
+/// prompt, newest last, and win over the defaults.
+model WhatsappStyleNote {
+  id        String   @id @default(uuid())
+  note      String   @db.Text
+  /// What they actually wrote, when the note is a rewrite of it.
+  original  String?  @db.Text
+  fromWaId  String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([active, createdAt])
+  @@map("whatsapp_style_notes")
+}
+
+/// A follow-up sequence for leads in given stages, edited on the admin page.
+/// Stages are CRM statuses ("Application_Initiated") or the bot's own ("bot:engaged").
+/// Steps are JSON: [{ delayHours, action: "ai"|"template", goal?, template?, when }].
+model WhatsappFollowupRule {
+  id          String   @id @default(uuid())
+  name        String
+  description String?  @db.Text
+  active      Boolean  @default(true)
+  /// Lower runs first when a stage matches several rules.
+  priority    Int      @default(100)
+  stages      String[] @default([])
+  /// Only chase leads whose conversion score is in this range (null = any).
+  minScore    Int?
+  maxScore    Int?
+  steps       Json
+  /// IST wall-clock, "HH:MM". Nothing is sent between quietStart and quietEnd.
+  quietStart  String   @default("20:30")
+  quietEnd    String   @default("09:30")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("whatsapp_followup_rules")
 }

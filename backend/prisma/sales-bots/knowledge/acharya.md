@@ -198,6 +198,7 @@ No law programme is offered.
 - Third-party portals list estimated fee ranges; these are not official and must not be quoted as Acharya's fees.
 - Hostel fees and transport fees: not published; counsellor shares on request.
 - Registration and counselling are free; application submission carries a fee (amount not published).
+- **Running offer: Rs 500 off the application fee** when the applicant downloads the Acharya Admissions mobile app and pays the application fee from the app. The discount is applied automatically at checkout in the app; it is not available when paying any other way. The app also gives live application-status alerts, document upload from the phone camera, and chat with their counsellor. Nothing else about the offer (an end date, a limit on numbers, whether it can be combined with anything) is published: a counsellor confirms.
 
 ## 5. Scholarships
 

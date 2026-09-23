@@ -46,6 +46,8 @@ export const chatAgentFormSchema = z.object({
     .array(z.enum(["phone", "name", "email"]))
     .min(1, "Pick at least one field")
     .max(3),
+  leadSoftAfter: z.number().int().min(0).max(20),
+  leadGateAfter: z.number().int().min(0).max(20),
   qualificationEnabled: z.boolean(),
   handoffTriggers: z.array(z.string().min(2).max(120)).max(20),
   handoffMessage: z.string().max(1000),
@@ -98,6 +100,8 @@ export const EMPTY_CHAT_AGENT_FORM_VALUES: ChatAgentFormValues = {
   instructions: "",
   leadCapture: "after_first_reply",
   leadFields: ["phone"],
+  leadSoftAfter: 3,
+  leadGateAfter: 6,
   qualificationEnabled: true,
   handoffTriggers: DEFAULT_HANDOFF_TRIGGERS,
   handoffMessage: "",
@@ -133,6 +137,9 @@ export function chatAgentToFormValues(agent: ChatAgent): ChatAgentFormValues {
     instructions: agent.instructions ?? "",
     leadCapture: agent.leadCapture,
     leadFields: agent.leadFields?.length ? agent.leadFields : ["phone"],
+    // Older API builds omit them; the server defaults are 3 and 6.
+    leadSoftAfter: agent.leadSoftAfter ?? 3,
+    leadGateAfter: agent.leadGateAfter ?? 6,
     // Older API builds omit it; the server default is on.
     qualificationEnabled: agent.qualificationEnabled ?? true,
     handoffTriggers: agent.handoffTriggers?.length

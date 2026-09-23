@@ -65,9 +65,14 @@ const REVIEW_TONES: Record<InboxReviewStatus, "muted" | "success-light" | "dange
   flagged: "danger-light",
 };
 
-/** Who was chatting — the tester's account name, a captured name, or the visitor id. */
-function threadName(item: Pick<InboxThread, "user" | "name" | "visitorId">) {
-  return item.user?.name?.trim() || item.name?.trim() || visitorLabel(item.visitorId);
+/**
+ * Who was chatting: the tester's account name, the name the bot learned (typed,
+ * recorded as a fact, or their WhatsApp profile), then the number they are
+ * reachable on. The visitor id is the last resort, for someone who told us
+ * nothing at all.
+ */
+function threadName(item: Pick<InboxThread, "user" | "name" | "visitorId" | "phone">) {
+  return item.user?.name?.trim() || item.name?.trim() || item.phone?.trim() || visitorLabel(item.visitorId);
 }
 
 /**
@@ -267,7 +272,7 @@ export function InboxView({ initialVisitorId }: { initialVisitorId?: string } = 
         <section className="flex min-h-0 flex-col border-b border-border lg:border-b-0 xl:border-r">
           <div className="flex min-w-0 items-center gap-3 border-b border-border px-4 py-2.5">
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold">{thread ? threadName({ visitorId: thread.visitor.id, user: thread.visitor.user, name: thread.collected.name }) : "No conversations yet"}</p>
+              <p className="truncate text-xs font-semibold">{thread ? threadName({ visitorId: thread.visitor.id, user: thread.visitor.user, name: thread.collected.name, phone: thread.collected.phone }) : "No conversations yet"}</p>
               <p className="truncate text-[11px] text-muted-foreground">
                 {thread ? `${thread.agent.name} · first seen ${getReadableDate(thread.visitor.firstSeenAt)}` : "Pick a conversation on the left"}
               </p>
@@ -595,7 +600,7 @@ function ThreadDetails({ thread }: { thread: InboxThreadDetail | undefined }) {
   }
 
   const { visitor, collected, context, usage, messages, agent } = thread;
-  const displayName = threadName({ visitorId: visitor.id, user: visitor.user, name: collected.name });
+  const displayName = threadName({ visitorId: visitor.id, user: visitor.user, name: collected.name, phone: collected.phone });
   const contactRows = CONTACT_FIELDS.filter((field) => collected[field.key]);
   const extracted = thread.custom ?? visitor.custom ?? null;
 

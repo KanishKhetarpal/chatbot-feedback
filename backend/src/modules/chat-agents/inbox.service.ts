@@ -51,8 +51,11 @@ export class InboxService {
         ratingComment: true,
         reviewStatus: true,
         deviceType: true,
+        channel: true,
+        custom: true,
         agent: { select: { id: true, name: true, avatarUrl: true } },
         user: { select: { id: true, name: true, email: true } },
+        whatsapp: { select: { waId: true, profileName: true } },
         _count: { select: { messages: true } },
       },
     });
@@ -98,10 +101,13 @@ export class InboxService {
           visitorId: visitor.id,
           agent: visitor.agent,
           user: visitor.user,
-          name: visitor.name,
+          name: this.displayNameOf(visitor),
           email: visitor.email,
+          /** The number they are reachable on, so a nameless thread is still a person. */
+          phone: visitor.phone ?? (visitor.whatsapp ? `+${visitor.whatsapp.waId}` : null),
+          channel: visitor.channel,
           /** Whether the visitor gave a mobile number - the sales test's own success flag. */
-          hasPhone: Boolean(visitor.phone),
+          hasPhone: Boolean(visitor.phone || visitor.whatsapp),
           deviceType: visitor.deviceType,
           firstSeenAt: visitor.firstSeenAt,
           lastSeenAt: visitor.lastSeenAt,
@@ -115,6 +121,21 @@ export class InboxService {
       }),
       nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
     };
+  }
+
+  /**
+   * Who this conversation is with, from every name we hold: what they typed,
+   * the first name the bot recorded, or their WhatsApp profile name. Null when
+   * we genuinely never learned one, and the list falls back to their number.
+   */
+  private displayNameOf(visitor: {
+    name: string | null;
+    custom: Prisma.JsonValue;
+    whatsapp?: { profileName: string | null } | null;
+  }): string | null {
+    const custom = (visitor.custom ?? {}) as Record<string, unknown>;
+    const first = typeof custom.firstName === 'string' ? custom.firstName.trim() : '';
+    return visitor.name?.trim() || first || visitor.whatsapp?.profileName?.trim() || null;
   }
 
   async getThread(visitorId: string) {

@@ -80,8 +80,11 @@ export class FeedbackPatternsService {
               id: true,
               agentId: true,
               name: true,
+              phone: true,
+              custom: true,
               rating: true,
               user: { select: { id: true, name: true, isGuest: true } },
+              whatsapp: { select: { waId: true, profileName: true } },
             },
           },
         },
@@ -211,12 +214,19 @@ export class FeedbackPatternsService {
       })
       .sort((a, b) => b.likes + b.dislikes - (a.likes + a.dislikes));
 
+    /** The first name the bot recorded as a fact, when they never filled a form. */
+    const firstNameOf = (custom: unknown): string | null => {
+      const value = ((custom ?? {}) as Record<string, unknown>).firstName;
+      return typeof value === 'string' && value.trim() ? value.trim() : null;
+    };
+
     const item = (m: (typeof rated)[number]) => ({
       messageId: m.id,
       visitorId: m.visitorId,
       agent: agentOf(m.visitor.agentId),
       user: m.visitor.user ? { id: m.visitor.user.id, name: m.visitor.user.name, isGuest: m.visitor.user.isGuest } : null,
-      visitorName: m.visitor.name,
+      visitorName: m.visitor.name ?? firstNameOf(m.visitor.custom) ?? m.visitor.whatsapp?.profileName ?? null,
+      visitorPhone: m.visitor.phone ?? (m.visitor.whatsapp ? `+${m.visitor.whatsapp.waId}` : null),
       question: questionFor(m),
       reply: m.content,
       model: m.model,

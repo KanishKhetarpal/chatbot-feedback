@@ -7,6 +7,8 @@ import {
   WidgetChatDto,
   WidgetConfigQueryDto,
   WidgetLeadDto,
+  WidgetOtpRequestDto,
+  WidgetOtpVerifyDto,
   WidgetSessionDto,
   WidgetStepDto,
 } from './dto/widget-chat.dto';
@@ -87,6 +89,33 @@ export class WidgetController {
   @ApiOperation({ summary: 'Visitor left their name / phone / email' })
   lead(@Body() dto: WidgetLeadDto, @Req() req: Request, @Headers('origin') origin?: string) {
     return this.widget.captureLead(dto, origin, readRequestContext(req));
+  }
+
+  @Post('otp/request')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Send a verification code to the number the visitor typed',
+    description:
+      'A 6-digit code on WhatsApp, valid 10 minutes, 3 codes per number per hour — the same rules as the ' +
+      'CRM student login. The number is never stored until the code comes back.',
+  })
+  @ApiResponse({ status: 200, description: '{ ok, channel, sentTo, expiresInSeconds }' })
+  @ApiResponse({ status: 400, description: 'The number is not valid for that country' })
+  @ApiResponse({ status: 429, description: 'Too many codes for this number' })
+  requestOtp(@Body() dto: WidgetOtpRequestDto, @Req() req: Request, @Headers('origin') origin?: string) {
+    return this.widget.requestOtp(dto, origin, readRequestContext(req));
+  }
+
+  @Post('otp/verify')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Check the code and store the verified number as the lead',
+    description: 'On success the number is saved on the visitor, marked verified over WhatsApp, and the lead is captured.',
+  })
+  @ApiResponse({ status: 200, description: '{ ok: true, verified: true, visitorToken }' })
+  @ApiResponse({ status: 401, description: 'otp_invalid | otp_expired | otp_attempts | otp_not_found' })
+  verifyOtp(@Body() dto: WidgetOtpVerifyDto, @Req() req: Request, @Headers('origin') origin?: string) {
+    return this.widget.verifyOtp(dto, origin, readRequestContext(req));
   }
 
   @Post('feedback/message')

@@ -364,6 +364,8 @@ export class ChatAgentsService {
       handoffOnFallback: dto.handoffOnFallback,
       leadCapture: dto.leadCapture,
       leadFields: dto.leadFields,
+      leadSoftAfter: dto.leadSoftAfter,
+      leadGateAfter: dto.leadGateAfter,
       qualificationEnabled: dto.qualificationEnabled,
       model: dto.model,
       effort: dto.effort,

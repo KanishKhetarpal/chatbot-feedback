@@ -383,6 +383,79 @@ export async function submitWidgetLead(input: {
   };
 }
 
+/* -- Phone verification ---------------------------------------------------- */
+
+export type WidgetOtpRequestResult = {
+  ok: boolean;
+  /** Masked number the code went to, for the "sent to …" line. */
+  sentTo: string;
+  expiresInSeconds: number;
+  /** Development only: the server could not deliver and was told to echo it. */
+  devCode?: string;
+  visitorToken: string | null;
+};
+
+/**
+ * Ask for a 6-digit code on WhatsApp. Same rules as the CRM's student login:
+ * the code lasts 10 minutes, three per number per hour.
+ */
+export async function requestWidgetOtp(input: {
+  token: string | null;
+  agentKey: string;
+  phone: string;
+  country?: string;
+}): Promise<WidgetOtpRequestResult> {
+  assertConfigured();
+  const res = await fetch(`${BASE}/widget/otp/request`, {
+    method: "POST",
+    headers: widgetHeaders(),
+    body: JSON.stringify({
+      ...(input.token ? { visitorToken: input.token } : { publicKey: input.agentKey, ...readBrowserContext() }),
+      phone: input.phone,
+      ...(input.country ? { country: input.country } : {}),
+    }),
+  });
+  if (!res.ok) throw await parseError(res);
+  const body = (await res.json().catch(() => ({}))) as Partial<WidgetOtpRequestResult>;
+  return {
+    ok: body.ok !== false,
+    sentTo: body.sentTo ?? "",
+    expiresInSeconds: body.expiresInSeconds ?? 600,
+    devCode: body.devCode,
+    visitorToken: body.visitorToken ?? null,
+  };
+}
+
+/** Send the code back. On success the number is stored as the lead, marked verified. */
+export async function verifyWidgetOtp(input: {
+  token: string | null;
+  agentKey: string;
+  phone: string;
+  country?: string;
+  code: string;
+  name?: string;
+  email?: string;
+  history: WidgetStoredMessage[];
+}): Promise<{ ok: boolean; verified: boolean; visitorToken: string | null }> {
+  assertConfigured();
+  const res = await fetch(`${BASE}/widget/otp/verify`, {
+    method: "POST",
+    headers: widgetHeaders(),
+    body: JSON.stringify({
+      ...(input.token ? { visitorToken: input.token } : { publicKey: input.agentKey, ...readBrowserContext() }),
+      phone: input.phone,
+      ...(input.country ? { country: input.country } : {}),
+      code: input.code,
+      ...(input.name?.trim() ? { name: input.name.trim() } : {}),
+      ...(input.email?.trim() ? { email: input.email.trim() } : {}),
+      history: toApiHistory(input.history),
+    }),
+  });
+  if (!res.ok) throw await parseError(res);
+  const body = (await res.json().catch(() => ({}))) as { ok?: boolean; verified?: boolean; visitorToken?: string | null };
+  return { ok: body.ok !== false, verified: Boolean(body.verified), visitorToken: body.visitorToken ?? null };
+}
+
 /* -- Feedback ------------------------------------------------------------- */
 
 /** Thumbs up / down on one reply. `rating: null` clears it. */

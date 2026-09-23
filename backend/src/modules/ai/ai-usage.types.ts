@@ -12,7 +12,8 @@ export type AiFeature =
   | 'email_authoring'
   | 'document_ai'
   | 'chat_widget'
-  | 'chat_agent_training';
+  | 'chat_agent_training'
+  | 'whatsapp_bot';
 
 /**
  * `user` — a person pressed something, so it is attributable to them.

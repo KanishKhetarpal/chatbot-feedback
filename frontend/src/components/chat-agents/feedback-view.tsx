@@ -61,7 +61,7 @@ function FeedbackCard({ item }: { item: FeedbackItem }) {
           <Bot className="size-3" /> {item.agent.name}
         </Badge>
         <Badge tone="muted">
-          <User className="size-3" /> {item.user?.name ?? item.visitorName ?? `Visitor ${item.visitorId.slice(0, 8)}`}
+          <User className="size-3" /> {item.user?.name ?? item.visitorName ?? item.visitorPhone ?? `Visitor ${item.visitorId.slice(0, 8)}`}
         </Badge>
         {item.conversationStars ? (
           <Badge tone="gold">

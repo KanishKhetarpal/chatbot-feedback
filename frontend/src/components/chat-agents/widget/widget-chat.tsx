@@ -62,6 +62,8 @@ import {
   sendWidgetMessage,
   stepWidgetFlow,
   submitWidgetLead,
+  requestWidgetOtp,
+  verifyWidgetOtp,
   WidgetApiError,
   WIDGET_TOKEN_TTL_SECONDS,
   writeVisitorToken,
@@ -488,6 +490,44 @@ export function WidgetChat({
     }
   }
 
+  /**
+   * Send a 6-digit code to the number they typed, so the lead we store is one a
+   * counsellor can actually reach.
+   *
+   * Returns null when this environment cannot deliver at all (no WhatsApp
+   * configured, or the number is outside the development allowlist). The form
+   * then stores the number unverified: a lead we cannot confirm still beats no
+   * lead, and the server records which of the two it was.
+   */
+  async function requestOtp(phone: string, country: string) {
+    try {
+      const result = await requestWidgetOtp({ token: tokenRef.current, agentKey, phone, country });
+      adoptToken(result.visitorToken);
+      return { sentTo: result.sentTo, devCode: result.devCode };
+    } catch (err) {
+      const code = err instanceof WidgetApiError ? err.code : undefined;
+      if (code === "otp_send_failed" || code === "otp_not_allowed") return null;
+      throw err;
+    }
+  }
+
+  /** The code came back: the server checks it and stores the number as the lead. */
+  async function verifyOtp(phone: string, country: string, code: string, name?: string, email?: string) {
+    const result = await verifyWidgetOtp({
+      token: tokenRef.current,
+      agentKey,
+      phone,
+      country,
+      code,
+      name,
+      email,
+      history: messages,
+    });
+    adoptToken(result.visitorToken);
+    markCaptured(agentKey);
+    setCaptureDone(true);
+  }
+
   /** A name + number typed into an interactive form or a locked guide. */
   async function submitInlineLead(name: string, phone: string, email?: string) {
     const result = await submitWidgetLead({ token: tokenRef.current, agentKey, name, phone, email, history: messages });
@@ -724,6 +764,8 @@ export function WidgetChat({
                       disabled={streaming}
                       onSend={(text) => send(text)}
                       onLead={submitInlineLead}
+                      onRequestOtp={requestOtp}
+                      onVerifyOtp={verifyOtp}
                       onLocal={finishLocalForm}
                       onTypeOwn={guided ? undefined : () => setTypeInstead(true)}
                       onSkipLocal={() => setTypeInstead(true)}

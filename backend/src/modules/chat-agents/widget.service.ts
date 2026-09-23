@@ -20,15 +20,18 @@ import { DEFAULT_LIMIT_MESSAGE } from './widget-limits.constants';
 import { resolveTheme } from './widget-theme';
 import { buildVisitorContext } from './visitor-context.util';
 import { GuidedFlowRuntimeService } from './guided-flow-runtime.service';
+import { WidgetOtpService } from './widget-otp.service';
 import { formatKnownFacts, type VisitorFacts } from './qualifier.util';
 import { detectPhone, extractFactsTag, looksLikeName, type ExtractedFacts } from './lead-extract.util';
 import { composeStored, extractReplyParts } from './ui-block.util';
 import {
   AUTO_MARKER,
   autoLeadMessage,
+  detectLeadTopic,
   asksForContactStep,
   asksForDetails,
   detectName,
+  isBlockingUi,
   isLeadForm,
   requireContact,
   storedHasLeadForm,
@@ -42,6 +45,8 @@ import type { TestChatAgentDto } from './dto/test-chat-agent.dto';
 import type {
   WidgetChatDto,
   WidgetChatMessageDto,
+  WidgetOtpRequestDto,
+  WidgetOtpVerifyDto,
   WidgetLeadDto,
   WidgetSessionDto,
   WidgetStepDto,
@@ -104,6 +109,8 @@ const AGENT_SELECT = {
   handoffMessage: true,
   qualificationEnabled: true,
   leadFields: true,
+  leadSoftAfter: true,
+  leadGateAfter: true,
   guidedFlow: true,
   model: true,
   effort: true,
@@ -152,6 +159,7 @@ export class WidgetService {
     private readonly limits: WidgetRateLimitService,
     private readonly training: TrainingService,
     private readonly guidedFlow: GuidedFlowRuntimeService,
+    private readonly otp: WidgetOtpService,
   ) {}
 
   // ── Config ─────────────────────────────────────────────────────────────────
@@ -318,11 +326,20 @@ export class WidgetService {
     const contact = facts ?? (await this.loadVisitorFacts(visitor.id));
     const botReplies = await this.countBotReplies(visitor.id);
 
+    // What they came for, so the ask promises something they actually want.
+    const leadTopic = detectLeadTopic([
+      dto.message ?? '',
+      ...[...history].reverse().filter((m) => m.role === 'user').map((m) => m.content),
+    ]);
+    // Both numbers are the agent's own (Leads tab); 0 switches that ask off.
+    const softAfter = agent.leadSoftAfter ?? LEAD_SOFT_AFTER;
+    const gateAfter = agent.leadGateAfter ?? LEAD_GATE_AFTER;
+
     // Compulsory details: once the gate form has been shown, nothing more until a number is left.
     const leadState = await this.leadState(visitor.id);
-    if (!contact?.phone && leadState.gateShown) {
+    if (!contact?.phone && leadState.gateShown && gateAfter > 0) {
       return {
-        reply: dto.nudge ? null : autoLeadMessage('gate', contact),
+        reply: dto.nudge ? null : autoLeadMessage('gate', contact, leadTopic),
         limited: false,
         retryAt: null,
         usage: null,
@@ -406,19 +423,27 @@ export class WidgetService {
       parts.media = [];
     }
 
-    // The lead rules: exactly at the 3rd reply (skippable) and the 6th
-    // (compulsory), each as its own message. If the reply is itself a question
-    // (a quiz step), the widget keeps that question answerable beside the
-    // skippable form; the compulsory one replaces it.
+    // The lead rules: the skippable form after `leadSoftAfter` replies, the
+    // compulsory one from `leadGateAfter`, each as its own message.
+    //
+    // One thing to tap at a time. If this reply already asks something tappable
+    // (a quiz step, a dropdown, a form), the skippable ask WAITS for the reply
+    // after it, rather than landing beside it: two option lists arriving
+    // together read as spam and break the back-and-forth. The compulsory form
+    // cannot wait, so it takes the reply's own question away instead: nothing
+    // else can be answered until the number is left, and a dead question below
+    // it would only mislead.
     let followup: string | null = null;
     if (!knownNow.phone && !dto.nudge) {
       const replies = botReplies + 1;
-      if (replies >= LEAD_GATE_AFTER) {
-        followup = autoLeadMessage('gate', knownNow);
+      const alreadyAsking = isBlockingUi(parts.ui);
+      if (gateAfter > 0 && replies >= gateAfter) {
+        if (alreadyAsking) parts.ui = null;
+        followup = autoLeadMessage('gate', knownNow, leadTopic);
         await this.markLead(visitor.id, 'leadGateShown');
-      } else if (replies >= LEAD_SOFT_AFTER && !leadState.softShown) {
+      } else if (softAfter > 0 && replies >= softAfter && !leadState.softShown && !alreadyAsking) {
         await this.markLead(visitor.id, 'leadSoftShown');
-        if (!isLeadForm(parts.ui)) followup = autoLeadMessage('soft', knownNow);
+        followup = autoLeadMessage('soft', knownNow, leadTopic);
       }
     }
     // The form is the ask: no second "what's your name?" bubble beside it.
@@ -936,6 +961,76 @@ export class WidgetService {
    * The visitor filled the details card. Stored on the visitor row so a
    * reviewer knows who was chatting; no CRM lead is created in this app.
    */
+  /**
+   * Send a verification code to the number they typed.
+   *
+   * Nothing is stored yet: an unverified number is not a lead, and writing it
+   * first would let anyone put someone else's number on a conversation. The
+   * agent and origin are checked exactly as they are for a chat turn, so this
+   * cannot be used as a free SMS gateway from another site.
+   */
+  async requestOtp(dto: WidgetOtpRequestDto, origin?: string, request?: RequestContext) {
+    const agent = await this.resolveChatAgent(dto);
+    this.assertOriginAllowed(agent.allowedOrigins, origin);
+    this.assertActive(agent.status);
+    const { visitor, issued } = await this.resolveOrCreateVisitor(dto, agent.id, request);
+
+    const e164 = this.otp.normalize(dto.phone, dto.country);
+    if (!e164) {
+      throw new BadRequestException({ message: 'That does not look like a complete number for that country.', error: 'phone_invalid' });
+    }
+    // One conversation cannot be used to hammer many numbers.
+    const verdict = await this.limits.consumeVisitor(visitor.id);
+    if (!verdict.allowed) {
+      throw new BadRequestException({ message: 'Too many requests. Try again shortly.', error: 'rate_limited' });
+    }
+    const result = await this.otp.request(e164);
+    return { ...result, visitorToken: issued };
+  }
+
+  /**
+   * Check the code, then save the number as the lead.
+   *
+   * The verified fact is kept with it (`phoneVerified`, `verifiedVia`), which is
+   * what the CRM records too, so a counsellor can tell a confirmed number from
+   * one somebody typed.
+   */
+  async verifyOtp(dto: WidgetOtpVerifyDto, origin?: string, request?: RequestContext) {
+    const agent = await this.resolveChatAgent(dto);
+    this.assertOriginAllowed(agent.allowedOrigins, origin);
+    this.assertActive(agent.status);
+
+    const e164 = this.otp.normalize(dto.phone, dto.country);
+    if (!e164) {
+      throw new BadRequestException({ message: 'That does not look like a complete number for that country.', error: 'phone_invalid' });
+    }
+    this.otp.verify(e164, dto.code);
+
+    const lead = await this.captureLead({ ...dto, phone: e164 } as WidgetLeadDto, origin, request);
+    const visitorId = await this.visitorIdFor(dto, agent.id, request);
+    if (visitorId) {
+      const row = await this.prisma.chatWidgetVisitor.findUnique({ where: { id: visitorId }, select: { custom: true } });
+      const custom = ((row?.custom ?? {}) as Record<string, unknown>) || {};
+      await this.prisma.chatWidgetVisitor.update({
+        where: { id: visitorId },
+        data: { custom: { ...custom, phoneVerified: true, verifiedVia: 'whatsapp_otp' } as object },
+      });
+    }
+    this.logger.log(`widget-otp verified agent=${agent.id} phone=${this.otp.mask(e164)}`);
+    return { ...lead, verified: true };
+  }
+
+  /** The visitor this request belongs to, without creating one. */
+  private async visitorIdFor(dto: { visitorToken?: string }, agentId: string, request?: RequestContext): Promise<string | null> {
+    if (!dto.visitorToken) return null;
+    try {
+      const { visitor } = await this.resolveOrCreateVisitor(dto as never, agentId, request);
+      return visitor.id;
+    } catch {
+      return null;
+    }
+  }
+
   async captureLead(dto: WidgetLeadDto, origin?: string, request?: RequestContext) {
     const agent = await this.resolveChatAgent(dto);
     this.assertOriginAllowed(agent.allowedOrigins, origin);

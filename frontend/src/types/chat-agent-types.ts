@@ -85,6 +85,12 @@ export type ChatAgent = {
   leadCapture: ChatAgentLeadCapture;
   leadFields: ChatAgentLeadField[];
   /**
+   * The server-enforced details ask: a skippable name + number form after this
+   * many bot replies, compulsory from `leadGateAfter`. 0 switches it off.
+   */
+  leadSoftAfter: number;
+  leadGateAfter: number;
+  /**
    * Counsellor persona: answer the question AND ask one qualifying question per
    * reply (mobile → name → course → year → level → city). Off = pure Q&A.
    * Defaults to true server-side.
@@ -440,9 +446,14 @@ export type InboxThread = {
   agent: { id: string; name: string; avatarUrl?: string | null };
   /** The signed-in tester, when the chat happened inside the app. */
   user: InboxUser | null;
+  /** Their name from wherever we learned it: typed, recorded as a fact, or their WhatsApp profile. */
   name: string | null;
   email: string | null;
-  /** True when a mobile number was captured (form or conversation). */
+  /** The number they are reachable on, so a nameless thread still reads as a person. */
+  phone: string | null;
+  /** web | whatsapp */
+  channel: string;
+  /** True when a mobile number was captured (form, conversation or WhatsApp). */
   hasPhone: boolean;
   deviceType: string | null;
   firstSeenAt: string;
@@ -777,6 +788,8 @@ export type FeedbackItem = {
   agent: { id: string; name: string; status: string; avatarUrl: string | null; model: string | null };
   user: { id: string; name: string; isGuest: boolean } | null;
   visitorName: string | null;
+  /** Their number, shown when no name was ever given. */
+  visitorPhone: string | null;
   question: string | null;
   reply: string;
   model: string | null;

@@ -4,15 +4,21 @@ import type { UiBlock } from './ui-block.util';
  * The lead rules every AI bot plays by, enforced here rather than trusted to
  * the prompt:
  *
- *   - after the bot's 3rd reply, a name + number form arrives as its own
- *     message, with a "not now" (once per conversation)
- *   - from the 6th reply on, the form is compulsory: no more answers until
+ *   - after `leadSoftAfter` bot replies, a name + number form arrives as its
+ *     own message, with a "not now" (once per conversation)
+ *   - from `leadGateAfter` on, the form is compulsory: no more answers until
  *     the visitor leaves a number
  *   - a form never asks for something the visitor already gave
+ *
+ * Both numbers live on the agent (Leads tab) so they can be tuned per bot
+ * without a deploy; 0 switches that ask off. They are enforced here, in the
+ * API, never in the widget: a caller who talks to the endpoint directly hits
+ * exactly the same wall.
  *
  * The forms these rules add carry `"auto"` so they are not counted as replies.
  */
 
+/** Used when the agent row has no number of its own. */
 export const LEAD_SOFT_AFTER = 3;
 export const LEAD_GATE_AFTER = 6;
 
@@ -125,34 +131,160 @@ function pick<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)];
 }
 
-/** The stored content of an auto lead message: one short line, then the form. */
-export function autoLeadMessage(kind: 'soft' | 'gate', known: KnownContact | null): string {
+/**
+ * What the visitor was actually asking about when the ask arrives.
+ *
+ * The ask is never "please give your number": it is "here is the one thing a
+ * counsellor can do for you that I can't, where should it go?". That thing
+ * depends on the conversation, so the topic picks the promise.
+ */
+export const LEAD_TOPICS = ['fees', 'scholarship', 'eligibility', 'hostel', 'placements', 'apply', 'visit', 'course'] as const;
+export type LeadTopic = (typeof LEAD_TOPICS)[number];
+
+const TOPIC_PATTERNS: Array<[LeadTopic, RegExp]> = [
+  ['scholarship', /\b(scholarship|waiver|concession|discount|free seat|stipend|ews|bpl)\w*/i],
+  ['fees', /\b(fee|cost|price|pricing|how much|expensive|afford|instal?ment|emi|tuition|budget)\w*/i],
+  ['placements', /\b(placement|package|salary|lpa|recruit|company|companies|job|internship)\w*/i],
+  ['hostel', /\b(hostel|room|mess|food|stay|accommodat|warden|residence)\w*|\bpg\b/i],
+  ['apply', /\b(apply|applic|admission form|register|registration|enrol|seat|book my seat)\w*/i],
+  ['eligibility', /\b(eligib|qualify|cut ?off|cutoff|rank|kcet|comedk|jee|neet|nata|kmat|pgcet|percentage|marks|criteria)\w*/i],
+  ['visit', /\b(visit|campus tour|come to campus|see the campus|counsell?or|call me|callback|talk to)\w*/i],
+  ['course', /\b(course|programme|program|branch|specialis|specializ|btech|mba|mca|bba|bca|pharmacy|nursing|design|architect)\w*|\bb\.?e\.?\b|\bb\.?com\b/i],
+];
+
+/**
+ * The topic of the ask, from the visitor's own messages, newest first. Falls
+ * back to `course` so the promise is always something concrete.
+ */
+export function detectLeadTopic(messages: string[]): LeadTopic {
+  for (const text of messages) {
+    if (!text) continue;
+    for (const [topic, re] of TOPIC_PATTERNS) if (re.test(text)) return topic;
+  }
+  return 'course';
+}
+
+/**
+ * Per topic: what the counsellor does that the bot cannot (`worth`), the line
+ * that carries it, and the form's own words. `worth` is the value proposition
+ * the ask is built on; nothing here promises a seat, a figure or a scholarship.
+ */
+const TOPIC_COPY: Record<LeadTopic, { worth: string[]; title: string; subtitle: string; submit: string }> = {
+  fees: {
+    worth: [
+      'The fee depends on your quota, and Acharya does not publish the figures. A counsellor can check yours and send it in writing',
+      'What you would actually pay changes with the quota you get in on, so a counsellor works out your exact figure and sends it across',
+    ],
+    title: 'The fee for your case',
+    subtitle: 'A counsellor sends the exact fee for your quota, plus what else it covers.',
+    submit: 'Send me my fee details',
+  },
+  scholarship: {
+    worth: [
+      'Whether you match a scholarship comes down to your rank band and category, and a counsellor can run that check for you today',
+      'A counsellor can check which scholarships you may match and what they would take off your fee',
+    ],
+    title: 'Your scholarship check',
+    subtitle: 'A counsellor checks the bands you may match and sends what it means for your fee.',
+    submit: 'Check what I may match',
+  },
+  eligibility: {
+    worth: [
+      'A counsellor can confirm your eligibility against your marks and give you the route in, in writing',
+      'Your route in depends on your marks and exam, and a counsellor confirms which one applies to you',
+    ],
+    title: 'Your eligibility, confirmed',
+    subtitle: 'A counsellor checks your marks against the rule and sends your route in.',
+    submit: 'Confirm my eligibility',
+  },
+  hostel: {
+    worth: [
+      'A counsellor can send you the hostel details with the charges, and hold a slot if you want to see the rooms',
+      'Hostel charges are not published, so a counsellor sends those and can arrange a look at the rooms',
+    ],
+    title: 'Hostel details for you',
+    subtitle: 'Rooms, what is included, charges, and a campus visit if you want one.',
+    submit: 'Send me the details',
+  },
+  placements: {
+    worth: [
+      'A counsellor can send you the placement record for your branch, not the headline number',
+      'Branch-wise placement figures come from the placement cell, and a counsellor can get yours sent over',
+    ],
+    title: 'Placements for your branch',
+    subtitle: 'Recruiters, roles and the record for the course you are looking at.',
+    submit: 'Send the placement report',
+  },
+  apply: {
+    worth: [
+      'A counsellor can take you through the application, check your documents before you submit, and tell you what happens after',
+      'Before you apply, a counsellor checks your documents and eligibility so nothing comes back rejected',
+    ],
+    title: 'Start your application',
+    subtitle: 'A counsellor checks your documents and walks you through the steps.',
+    submit: 'Help me apply',
+  },
+  visit: {
+    worth: [
+      'A counsellor can call you at a time you pick and set up a campus visit',
+      'To set up the call or the visit, the counsellor needs somewhere to reach you',
+    ],
+    title: 'Talk to a counsellor',
+    subtitle: 'A call at a time that suits you, or a campus visit.',
+    submit: 'Set it up',
+  },
+  course: {
+    worth: [
+      'A counsellor can go through your options properly and send you the details that apply to your case',
+      'A counsellor can look at your marks and interests together and tell you which course actually fits',
+    ],
+    title: 'Your options, in writing',
+    subtitle: 'A counsellor sends what fits you: the course, the route in and the next step.',
+    submit: 'Send it to me',
+  },
+};
+
+/**
+ * The stored content of an auto lead message: one short line that says what
+ * they get and why the bot cannot give it, then the form.
+ *
+ * The soft one is an offer with a "not now". The compulsory one says plainly
+ * that this is where the chat needs a person, and still gives the reason.
+ */
+export function autoLeadMessage(kind: 'soft' | 'gate', known: KnownContact | null, topic: LeadTopic = 'course'): string {
   const fields = [...(known?.name ? [] : ['name']), 'phone'];
   const soft = kind === 'soft';
   const first = known?.name?.trim().split(/\s+/)[0];
   // Ask only for what is missing, and say so in the words.
   const what = first ? 'number' : 'name and number';
   const you = first ? `, ${first}` : '';
+  const copy = TOPIC_COPY[topic] ?? TOPIC_COPY.course;
+  const worth = pick(copy.worth);
   const line = soft
     ? pick([
-        `Quick one${you}: what ${what} should the counsellor use to send you the exact details?`,
-        `So a counsellor can WhatsApp you the exact fee and next steps${you}, what ${what} should I use?`,
-        `Let me get your ${what} on file${you}, so everything we covered reaches you on WhatsApp.`,
+        `${worth}. What ${what} should they use${you}?`,
+        `${worth}. Where should that go${you}?`,
+        `Here is the bit I can't do from here${you}: ${lower(worth)}. What ${what} works?`,
       ])
     : pick([
-        `To keep going${you}, I'll need your ${what}, so a counsellor can confirm the details that apply to you.`,
-        `Before we go further${you}, please share your ${what}: the rest depends on your exact case, and a counsellor confirms it.`,
+        `This is where it needs a person${you}. ${worth}, and for that they need your ${what}.`,
+        `From here it is your case, not general information${you}. ${worth}. Leave your ${what} and they will take it from there.`,
       ]);
   const form = {
     type: 'form',
     icon: 'phone',
-    title: soft ? 'Get the exact details for you' : 'Your details to continue',
-    subtitle: 'Fee for your quota, eligibility and next steps, from a counsellor.',
+    title: copy.title,
+    subtitle: copy.subtitle,
     fields,
-    submit: soft ? 'Send me the details' : 'Continue',
+    submit: soft ? copy.submit : 'Continue',
     ...(soft ? { skip: 'Not now, keep chatting', quietSkip: true } : { gate: true }),
-    note: 'Used only by Acharya admissions for your enquiry. Say stop anytime.',
+    note: 'One counsellor, about this enquiry only. Say stop anytime and it ends.',
     auto: kind,
   };
   return `${line}\n\n<ui>${JSON.stringify(form)}</ui>`;
+}
+
+/** Lowercase the first word of a sentence when it is dropped mid-line. */
+function lower(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1);
 }

@@ -196,6 +196,13 @@ export class WidgetStepDto {
   nodeId!: string;
 }
 
+/**
+ * Phone verification, the same shape as the CRM's student login: ask for a
+ * code, then send it back with the number it was sent to.
+ *
+ * Both extend the lead payload, because that is exactly what a verified number
+ * becomes: the same fields, the same first-visit context, plus the code.
+ */
 export class WidgetLeadDto {
   @ApiPropertyOptional({ description: 'Visitor token. Omit if the visitor has not chatted yet and send publicKey.' })
   @IsOptional()
@@ -252,3 +259,26 @@ export class WidgetLeadDto {
   @Type(() => WidgetChatMessageDto)
   history?: WidgetChatMessageDto[];
 }
+
+export class WidgetOtpRequestDto extends WidgetLeadDto {
+  @ApiProperty({ example: '+919148089847', description: 'The number to verify, E.164 preferred.' })
+  @IsString()
+  @MinLength(6)
+  @MaxLength(24)
+  declare phone: string;
+
+  @ApiPropertyOptional({ example: 'IN', description: 'ISO2 country, for a number typed without its dial code.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2)
+  country?: string;
+}
+
+export class WidgetOtpVerifyDto extends WidgetOtpRequestDto {
+  @ApiProperty({ example: '482910', description: 'The 6-digit code we sent on WhatsApp.' })
+  @IsString()
+  @MinLength(4)
+  @MaxLength(8)
+  code!: string;
+}
+

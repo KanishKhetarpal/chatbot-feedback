@@ -15,6 +15,8 @@ import { TrainingService } from './training.service';
 import { WidgetController } from './widget.controller';
 import { WidgetRateLimitService } from './widget-rate-limit.service';
 import { WidgetService } from './widget.service';
+import { WidgetOtpService } from './widget-otp.service';
+import { McubeClient } from '../whatsapp/mcube.client';
 
 @Module({
   imports: [
@@ -35,6 +37,11 @@ import { WidgetService } from './widget.service';
     TrainingService,
     WidgetService,
     WidgetRateLimitService,
+    WidgetOtpService,
+    // The widget's phone verification goes out over the same WhatsApp account
+    // the bot uses; the client is stateless, so it is provided here rather than
+    // importing the WhatsApp module and its worker.
+    McubeClient,
   ],
   exports: [ChatAgentsService, KnowledgeService, TrainingService],
 })

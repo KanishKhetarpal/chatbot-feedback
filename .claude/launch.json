@@ -4,14 +4,52 @@
     {
       "name": "backend",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--dir", "backend", "start:dev"],
+      "runtimeArgs": [
+        "--dir",
+        "backend",
+        "start:dev"
+      ],
+      "port": 3100
+    },
+    {
+      "name": "backend-live",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "backend",
+        "start"
+      ],
       "port": 3100
     },
     {
       "name": "frontend",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--dir", "frontend", "dev"],
+      "runtimeArgs": [
+        "--dir",
+        "frontend",
+        "dev"
+      ],
       "port": 5173
+    },
+    {
+      "name": "crm-api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "C:/Users/kanis/AcharyaUniversityCRM",
+        "start:dev"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "crm-frontend",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "C:/Users/kanis/AcharyaUniversityCRMFrontend",
+        "dev"
+      ],
+      "port": 8080
     }
   ]
 }
