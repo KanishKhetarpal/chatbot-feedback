@@ -30,7 +30,9 @@ export const ICON_NAMES = [
 const short = (max: number) => z.string().trim().min(1).max(max);
 const Icon = z.enum(ICON_NAMES);
 
-const Progress = z.object({ step: z.number().int().min(1).max(20), total: z.number().int().min(1).max(20) });
+// step 0 is legitimate: a freshly built plan has nothing done yet. With min(1)
+// every starting <plan> failed validation and was silently dropped.
+const Progress = z.object({ step: z.number().int().min(0).max(20), total: z.number().int().min(1).max(20) });
 
 const ChipsBlock = z.object({
   type: z.literal('chips'),

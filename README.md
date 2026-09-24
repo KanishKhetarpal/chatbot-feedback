@@ -162,7 +162,21 @@ API: `GET /widget-inbox`, `/stats`, `/export`, `/:visitorId`, `PATCH /:visitorId
 5. After the first deploy, run the seed once from the Railway shell: `pnpm db:seed`.
 6. Load the six sales bots (needs `ANTHROPIC_API_KEY`; safe to re-run after any change to `prisma/sales-bots/`): `pnpm db:seed:bots`. To clear out bots listed in `retired.json` for good: `pnpm db:delete-retired-bots`.
 
-Deploying with the Railway CLI instead of GitHub:
+**One command (deploy + load the bots):** [`backend/scripts/deploy.sh`](backend/scripts/deploy.sh) uploads `backend/` with the Railway CLI, waits for the build, runs `pnpm db:seed:bots` inside the running service, and prints each touched bot's share link and embed `<script>` tag.
+
+```bash
+npm i -g @railway/cli && railway login
+cd backend && railway link            # once: project chatbot-feedback, the backend service
+bash scripts/deploy.sh                # deploy + re-seed Shreya
+bash scripts/deploy.sh all            # deploy + re-seed every bot
+bash scripts/deploy.sh --no-deploy shreya   # re-seed only
+```
+
+The frontend only needs redeploying when something under `frontend/` changed; bot prompts live in the database and ship with the seed.
+
+**Widget OTP while testing.** Every code is `123456` (`WIDGET_OTP_BYPASS_CODE`, defaulting to `123456` when unset, like the CRM widget's `OTP_BYPASS_CODE`), and a code that cannot be delivered is still accepted. Before go-live set `WIDGET_OTP_BYPASS_CODE=` (empty) on Railway to go back to random codes.
+
+Deploying with the Railway CLI by hand:
 
 ```bash
 npm i -g @railway/cli

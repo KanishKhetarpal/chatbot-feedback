@@ -126,7 +126,8 @@ export class WidgetOtpService {
   async request(e164: string, visitorId?: string): Promise<OtpRequestResult> {
     this.checkRateLimit(e164);
     if (visitorId) this.checkRateLimit(`visitor:${visitorId}`, this.MAX_PER_VISITOR);
-    const code = process.env.WIDGET_OTP_BYPASS_CODE || String(Math.floor(100000 + Math.random() * 900000));
+    const bypass = bypassCode();
+    const code = bypass || String(Math.floor(100000 + Math.random() * 900000));
     this.store.set(e164, { code, expiresAt: Date.now() + this.TTL_MS, attempts: 0 });
 
     if (!this.allowed(e164)) {
@@ -136,6 +137,11 @@ export class WidgetOtpService {
       this.refund(e164, visitorId);
       if (process.env.WIDGET_OTP_DEV_ECHO === 'true') {
         return { ok: true, channel: 'whatsapp', sentTo: this.mask(e164), expiresInSeconds: this.TTL_MS / 1000, devCode: code };
+      }
+      // Same as the CRM widget: with a bypass code in force, an undelivered code
+      // is still enterable, so the tester types the bypass code instead.
+      if (bypass) {
+        return { ok: true, channel: 'whatsapp', sentTo: this.mask(e164), expiresInSeconds: this.TTL_MS / 1000 };
       }
       this.store.delete(e164);
       throw new HttpException(
@@ -174,6 +180,11 @@ export class WidgetOtpService {
       this.refund(e164, visitorId);
       if (process.env.WIDGET_OTP_DEV_ECHO === 'true') {
         return { ok: true, channel: 'whatsapp', sentTo: this.mask(e164), expiresInSeconds: this.TTL_MS / 1000, devCode: code };
+      }
+      // Same as the CRM widget: with a bypass code in force, an undelivered code
+      // is still enterable, so the tester types the bypass code instead.
+      if (bypass) {
+        return { ok: true, channel: 'whatsapp', sentTo: this.mask(e164), expiresInSeconds: this.TTL_MS / 1000 };
       }
       this.store.delete(e164);
       throw new HttpException(
@@ -217,4 +228,13 @@ export class WidgetOtpService {
     this.store.delete(e164);
     this.rate.delete(e164);
   }
+}
+
+/**
+ * The fixed code every OTP uses while testing, as the CRM widget's
+ * OTP_BYPASS_CODE does. Defaults to 123456 when WIDGET_OTP_BYPASS_CODE is not
+ * set at all; set it to an empty value to switch back to random codes.
+ */
+function bypassCode(): string {
+  return (process.env.WIDGET_OTP_BYPASS_CODE ?? '123456').trim();
 }
