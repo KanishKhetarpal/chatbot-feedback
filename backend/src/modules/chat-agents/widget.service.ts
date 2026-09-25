@@ -369,22 +369,21 @@ export class WidgetService {
     }
     // The lead rules: the skippable form after `leadSoftAfter` replies, the
     // compulsory one from `leadGateAfter`. The form never rides along under an
-    // answer. When one is due, it IS the reply: their message is held, and it
-    // is answered once the form is filled in or skipped.
+    // answer, and never comes before the answer it is due on: that reply goes
+    // out whole (their fits, a verdict, whatever they asked), the form is armed,
+    // and it is sent on its own in place of the NEXT reply. The message it holds
+    // back is answered once the form is filled in or skipped.
     const lastBot = [...history].reverse().find((m) => m.role === 'assistant');
     if (!dto.nudge && !contact?.phone && !detectPhone(dto.message)) {
       const replies = botReplies + 1;
       const gateDue = gateAfter > 0 && replies >= gateAfter;
-      // The skippable one waits while they are mid-answer (a quiz step, a
-      // dropdown) and never follows a details form of the bot's own. A form
-      // the bot tried to put under an answer is due now, threshold or not.
-      const softDue =
-        (leadState.pending || (softAfter > 0 && replies >= softAfter)) &&
-        !leadState.softShown &&
-        !isBlockingUi(storedUi(lastBot?.content)) &&
-        !storedHasLeadForm(lastBot?.content);
-      if (gateDue || softDue) {
-        const kind = gateDue ? 'gate' : 'soft';
+      const softDue = softAfter > 0 && replies >= softAfter && !leadState.softShown;
+      const pending = leadState.pending;
+      // The skippable one also waits while they are mid-answer (a quiz step, a
+      // dropdown) and never follows a details form of the bot's own.
+      const softCanGo = !isBlockingUi(storedUi(lastBot?.content)) && !storedHasLeadForm(lastBot?.content);
+      if (pending === 'gate' || (pending === 'soft' && !gateDue && softCanGo)) {
+        const kind = pending;
         const form = autoLeadMessage(kind, contact, leadTopic);
         const askedAt = new Date();
         const [, formRow] = await this.prisma.$transaction([
@@ -398,8 +397,7 @@ export class WidgetService {
           }),
           this.prisma.chatWidgetVisitor.update({ where: { id: visitor.id }, data: { lastSeenAt: new Date() } }),
         ]);
-        await this.setLeadFlag(visitor.id, kind === 'gate' ? 'leadGateShown' : 'leadSoftShown', true);
-        if (leadState.pending) await this.setLeadFlag(visitor.id, 'leadPending', false);
+        await this.setLeadFlags(visitor.id, { [kind === 'gate' ? 'leadGateShown' : 'leadSoftShown']: true, leadPending: null });
         return {
           reply: form,
           limited: false,
@@ -409,6 +407,8 @@ export class WidgetService {
           assistantMessageId: formRow.id,
         };
       }
+      if (gateDue) await this.setLeadFlags(visitor.id, { leadPending: 'gate' });
+      else if (softDue && !pending) await this.setLeadFlags(visitor.id, { leadPending: 'soft' });
     }
 
     // Right after a lead form: answer what it held back.
@@ -478,7 +478,9 @@ export class WidgetService {
     if (!knownNow.phone && isLeadForm(parts.ui) && !wasGuide && (dto.nudge || !asksForContactStep(dto.message))) {
       parts.ui = null;
       if (parts.then && asksForDetails(parts.then)) parts.then = '';
-      if (!leadState.softShown && !leadState.gateShown && !dto.nudge) await this.setLeadFlag(visitor.id, 'leadPending', true);
+      if (!leadState.softShown && !leadState.gateShown && !leadState.pending && !dto.nudge) {
+        await this.setLeadFlags(visitor.id, { leadPending: 'soft' });
+      }
     }
     if (isLeadForm(parts.ui)) parts.next = [];
 
@@ -536,14 +538,15 @@ export class WidgetService {
     return {
       softShown: Boolean(custom.leadSoftShown),
       gateShown: Boolean(custom.leadGateShown),
-      pending: Boolean(custom.leadPending),
+      /** A form armed on an earlier reply, sent in place of the next one. */
+      pending: custom.leadPending === 'gate' ? ('gate' as const) : custom.leadPending ? ('soft' as const) : null,
     };
   }
 
-  private async setLeadFlag(visitorId: string, flag: 'leadSoftShown' | 'leadGateShown' | 'leadPending', value: boolean) {
+  private async setLeadFlags(visitorId: string, flags: { leadSoftShown?: boolean; leadGateShown?: boolean; leadPending?: 'soft' | 'gate' | null }) {
     const row = await this.prisma.chatWidgetVisitor.findUnique({ where: { id: visitorId }, select: { custom: true } });
     const custom = ((row?.custom ?? {}) as Record<string, unknown>) || {};
-    await this.prisma.chatWidgetVisitor.update({ where: { id: visitorId }, data: { custom: { ...custom, [flag]: value } as object } });
+    await this.prisma.chatWidgetVisitor.update({ where: { id: visitorId }, data: { custom: { ...custom, ...flags } as object } });
   }
 
   private async resolveChatAgent(dto: VisitorIdentity) {
