@@ -4,10 +4,13 @@ import type { UiBlock } from './ui-block.util';
  * The lead rules every AI bot plays by, enforced here rather than trusted to
  * the prompt:
  *
- *   - after `leadSoftAfter` bot replies, a name + number form arrives as its
- *     own message, with a "not now" (once per conversation)
+ *   - after `leadSoftAfter` bot replies, a name + number form with a "not now"
+ *     (once per conversation)
  *   - from `leadGateAfter` on, the form is compulsory: no more answers until
  *     the visitor leaves a number
+ *   - either form is a turn of its own, never under an answer: it is sent in
+ *     place of the reply, and the message it held back is answered once the
+ *     form is filled in or skipped
  *   - a form never asks for something the visitor already gave
  *
  * Both numbers live on the agent (Leads tab) so they can be tuned per bot
@@ -57,6 +60,28 @@ export function storedHasLeadForm(content: string | undefined): boolean {
   }
 }
 
+/** The element a stored bot message carried, parsed loosely (only its type is relied on). */
+export function storedUi(content: string | undefined): UiBlock | null {
+  const raw = content?.match(/<ui>([\s\S]*?)<\/ui>/)?.[1];
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as UiBlock;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The visitor message a lead form was sent in place of an answer to, when the
+ * form is the last thing the bot said. Answered on the turn after the form.
+ */
+export function heldQuestion(history: { role: string; content: string }[]): string | null {
+  const last = history[history.length - 1];
+  const before = history[history.length - 2];
+  if (!last || last.role !== 'assistant' || !last.content.includes(AUTO_MARKER)) return null;
+  return before?.role === 'user' ? before.content : null;
+}
+
 /** The visitor asked for something that genuinely needs their details. */
 export function asksForContactStep(message: string): boolean {
   return /\b(call|callback|call back|video|visit|book|whatsapp|send|report|guide|slot|counsell?or)\b/i.test(message);
@@ -70,15 +95,6 @@ export function asksForDetails(text: string): boolean {
 /** A question the visitor answers by tapping or filling in. */
 export function isBlockingUi(ui: UiBlock | null): boolean {
   return Boolean(ui && (ui.type === 'chips' || ui.type === 'select' || ui.type === 'form'));
-}
-
-/**
- * A tool's payoff: the fits ranking or a result card (eligibility verdict,
- * scholarship matches). The visitor sees it on its own, with its actions, and
- * the lead ask waits for the reply after it.
- */
-export function isPayoffUi(ui: UiBlock | null): boolean {
-  return Boolean(ui && (ui.type === 'fits' || (ui.type === 'card' && ui.variant === 'result')));
 }
 
 export function isLeadForm(ui: UiBlock | null): boolean {
@@ -286,7 +302,8 @@ export function autoLeadMessage(kind: 'soft' | 'gate', known: KnownContact | nul
     subtitle: copy.subtitle,
     fields,
     submit: soft ? copy.submit : 'Continue',
-    ...(soft ? { skip: 'Not now, keep chatting', quietSkip: true } : { gate: true }),
+    // "Not now" is sent as their answer, so the message the form held back gets its reply.
+    ...(soft ? { skip: 'Not now, keep chatting' } : { gate: true }),
     note: 'One counsellor, about this enquiry only. Say stop anytime and it ends.',
     auto: kind,
   };

@@ -31,11 +31,12 @@ import {
   asksForContactStep,
   asksForDetails,
   detectName,
+  heldQuestion,
   isBlockingUi,
-  isPayoffUi,
   isLeadForm,
   requireContact,
   storedHasLeadForm,
+  storedUi,
   LEAD_GATE_AFTER,
   LEAD_SOFT_AFTER,
   withoutKnownFields,
@@ -366,7 +367,59 @@ export class WidgetService {
         };
       }
     }
-    const turnMessage = dto.nudge ? NUDGE_INSTRUCTION : dto.message;
+    // The lead rules: the skippable form after `leadSoftAfter` replies, the
+    // compulsory one from `leadGateAfter`. The form never rides along under an
+    // answer. When one is due, it IS the reply: their message is held, and it
+    // is answered once the form is filled in or skipped.
+    const lastBot = [...history].reverse().find((m) => m.role === 'assistant');
+    if (!dto.nudge && !contact?.phone && !detectPhone(dto.message)) {
+      const replies = botReplies + 1;
+      const gateDue = gateAfter > 0 && replies >= gateAfter;
+      // The skippable one waits while they are mid-answer (a quiz step, a
+      // dropdown) and never follows a details form of the bot's own. A form
+      // the bot tried to put under an answer is due now, threshold or not.
+      const softDue =
+        (leadState.pending || (softAfter > 0 && replies >= softAfter)) &&
+        !leadState.softShown &&
+        !isBlockingUi(storedUi(lastBot?.content)) &&
+        !storedHasLeadForm(lastBot?.content);
+      if (gateDue || softDue) {
+        const kind = gateDue ? 'gate' : 'soft';
+        const form = autoLeadMessage(kind, contact, leadTopic);
+        const askedAt = new Date();
+        const [, formRow] = await this.prisma.$transaction([
+          this.prisma.chatWidgetMessage.create({
+            data: { visitorId: visitor.id, role: 'user', content: dto.message, createdAt: askedAt },
+            select: { id: true },
+          }),
+          this.prisma.chatWidgetMessage.create({
+            data: { visitorId: visitor.id, role: 'assistant', content: form, createdAt: new Date(askedAt.getTime() + 1) },
+            select: { id: true },
+          }),
+          this.prisma.chatWidgetVisitor.update({ where: { id: visitor.id }, data: { lastSeenAt: new Date() } }),
+        ]);
+        await this.setLeadFlag(visitor.id, kind === 'gate' ? 'leadGateShown' : 'leadSoftShown', true);
+        if (leadState.pending) await this.setLeadFlag(visitor.id, 'leadPending', false);
+        return {
+          reply: form,
+          limited: false,
+          retryAt: null,
+          usage: null,
+          visitorToken: issued,
+          assistantMessageId: formRow.id,
+        };
+      }
+    }
+
+    // Right after a lead form: answer what it held back.
+    const held = heldQuestion(history);
+    const turnMessage = dto.nudge
+      ? NUDGE_INSTRUCTION
+      : held
+        ? `${dto.message}\n\n[The details form came before your answer to their previous message: "${held}". ` +
+          `${contact?.phone ? 'They have now left their details: thank them in a few words, then' : 'They skipped it: do not ask for their details again, and'} ` +
+          `reply to that message now exactly as you would have if the form had not come in between.]`
+        : dto.message;
 
     const askedAt = new Date();
     const { result, latencyMs } = await this.runTurn(
@@ -410,13 +463,22 @@ export class WidgetService {
       phone: contact?.phone || learned.mobile || null,
       email: contact?.email || learned.email || null,
     };
+    const wasGuide = parts.ui?.type === 'guide';
     parts.ui = requireContact(withoutKnownFields(parts.ui, knownNow), knownNow);
 
     // Right after a details form went unanswered, the next reply does not ask
     // again, unless the visitor asked for something that needs their details.
-    const lastBot = [...history].reverse().find((m) => m.role === 'assistant');
     if (!knownNow.phone && !dto.nudge && isLeadForm(parts.ui) && storedHasLeadForm(lastBot?.content) && !asksForContactStep(dto.message)) {
       parts.ui = null;
+    }
+    // A details form the visitor did not ask for never sits under an answer,
+    // whatever a bot's prompt says: it comes off this reply and arrives on its
+    // own as the next turn (see the lead rules above). A guide they unlock
+    // with their number, or a call or visit they asked for, stays.
+    if (!knownNow.phone && isLeadForm(parts.ui) && !wasGuide && (dto.nudge || !asksForContactStep(dto.message))) {
+      parts.ui = null;
+      if (parts.then && asksForDetails(parts.then)) parts.then = '';
+      if (!leadState.softShown && !leadState.gateShown && !dto.nudge) await this.setLeadFlag(visitor.id, 'leadPending', true);
     }
     if (isLeadForm(parts.ui)) parts.next = [];
 
@@ -425,40 +487,8 @@ export class WidgetService {
       parts.media = [];
     }
 
-    // The lead rules: the skippable form after `leadSoftAfter` replies, the
-    // compulsory one from `leadGateAfter`, each as its own message.
-    //
-    // One thing to tap at a time. If this reply already asks something tappable
-    // (a quiz step, a dropdown, a form), the skippable ask WAITS for the reply
-    // after it, rather than landing beside it: two option lists arriving
-    // together read as spam and break the back-and-forth. The compulsory form
-    // cannot wait, so it takes the reply's own question away instead: nothing
-    // else can be answered until the number is left, and a dead question below
-    // it would only mislead.
-    let followup: string | null = null;
-    if (!knownNow.phone && !dto.nudge) {
-      const replies = botReplies + 1;
-      const alreadyAsking = isBlockingUi(parts.ui);
-      // A result (their fits, a verdict) is shown alone, actions and all; the
-      // ask, compulsory or not, arrives with the reply after it.
-      const payoff = isPayoffUi(parts.ui) && !leadState.gateShown;
-      if (gateAfter > 0 && replies >= gateAfter && !payoff) {
-        if (alreadyAsking) parts.ui = null;
-        // Card actions, follow-up bubbles and suggestions would all be dead
-        // taps under a compulsory form: the server answers nothing until the
-        // number is left, so the form is the only thing left to do.
-        if (parts.ui && 'actions' in parts.ui) parts.ui = { ...parts.ui, actions: [] };
-        parts.then = '';
-        parts.next = [];
-        followup = autoLeadMessage('gate', knownNow, leadTopic);
-        await this.markLead(visitor.id, 'leadGateShown');
-      } else if (softAfter > 0 && replies >= softAfter && !leadState.softShown && !alreadyAsking && !payoff) {
-        await this.markLead(visitor.id, 'leadSoftShown');
-        followup = autoLeadMessage('soft', knownNow, leadTopic);
-      }
-    }
     // The form is the ask: no second "what's your name?" bubble beside it.
-    if ((followup || isLeadForm(parts.ui)) && parts.then && asksForDetails(parts.then)) parts.then = '';
+    if (isLeadForm(parts.ui) && parts.then && asksForDetails(parts.then)) parts.then = '';
 
     const cleanReply = composeStored(parts);
     if (agent.qualificationEnabled && !dto.nudge) {
@@ -482,14 +512,6 @@ export class WidgetService {
         `cacheRead=${result.usage.cacheReadTokens} cacheWrite=${result.usage.cacheWriteTokens}`,
     );
 
-    // Stored after the reply, so a reloaded thread shows it in the same place.
-    const followupRow = followup
-      ? await this.prisma.chatWidgetMessage.create({
-          data: { visitorId: visitor.id, role: 'assistant', content: followup, createdAt: new Date(Date.now() + 1) },
-          select: { id: true },
-        })
-      : null;
-
     return {
       reply: cleaned.text,
       limited: false,
@@ -498,8 +520,6 @@ export class WidgetService {
       visitorToken: issued,
       /** So the widget can attach a thumbs-up/down to this exact reply. */
       assistantMessageId: stored?.assistantMessageId ?? null,
-      /** A second bot message (the lead form), shown right after the reply. */
-      followup: followup && followupRow ? { id: followupRow.id, content: followup } : null,
     };
   }
 
@@ -513,13 +533,17 @@ export class WidgetService {
   private async leadState(visitorId: string) {
     const row = await this.prisma.chatWidgetVisitor.findUnique({ where: { id: visitorId }, select: { custom: true } });
     const custom = ((row?.custom ?? {}) as Record<string, unknown>) || {};
-    return { softShown: Boolean(custom.leadSoftShown), gateShown: Boolean(custom.leadGateShown) };
+    return {
+      softShown: Boolean(custom.leadSoftShown),
+      gateShown: Boolean(custom.leadGateShown),
+      pending: Boolean(custom.leadPending),
+    };
   }
 
-  private async markLead(visitorId: string, flag: 'leadSoftShown' | 'leadGateShown') {
+  private async setLeadFlag(visitorId: string, flag: 'leadSoftShown' | 'leadGateShown' | 'leadPending', value: boolean) {
     const row = await this.prisma.chatWidgetVisitor.findUnique({ where: { id: visitorId }, select: { custom: true } });
     const custom = ((row?.custom ?? {}) as Record<string, unknown>) || {};
-    await this.prisma.chatWidgetVisitor.update({ where: { id: visitorId }, data: { custom: { ...custom, [flag]: true } as object } });
+    await this.prisma.chatWidgetVisitor.update({ where: { id: visitorId }, data: { custom: { ...custom, [flag]: value } as object } });
   }
 
   private async resolveChatAgent(dto: VisitorIdentity) {
