@@ -72,6 +72,15 @@ export function isBlockingUi(ui: UiBlock | null): boolean {
   return Boolean(ui && (ui.type === 'chips' || ui.type === 'select' || ui.type === 'form'));
 }
 
+/**
+ * A tool's payoff: the fits ranking or a result card (eligibility verdict,
+ * scholarship matches). The visitor sees it on its own, with its actions, and
+ * the lead ask waits for the reply after it.
+ */
+export function isPayoffUi(ui: UiBlock | null): boolean {
+  return Boolean(ui && (ui.type === 'fits' || (ui.type === 'card' && ui.variant === 'result')));
+}
+
 export function isLeadForm(ui: UiBlock | null): boolean {
   return Boolean(ui && ui.type === 'form' && ui.fields.some((f) => LEAD_FIELDS.has(f)));
 }

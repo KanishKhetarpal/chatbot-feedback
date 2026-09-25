@@ -32,6 +32,7 @@ import {
   asksForDetails,
   detectName,
   isBlockingUi,
+  isPayoffUi,
   isLeadForm,
   requireContact,
   storedHasLeadForm,
@@ -438,7 +439,10 @@ export class WidgetService {
     if (!knownNow.phone && !dto.nudge) {
       const replies = botReplies + 1;
       const alreadyAsking = isBlockingUi(parts.ui);
-      if (gateAfter > 0 && replies >= gateAfter) {
+      // A result (their fits, a verdict) is shown alone, actions and all; the
+      // ask, compulsory or not, arrives with the reply after it.
+      const payoff = isPayoffUi(parts.ui) && !leadState.gateShown;
+      if (gateAfter > 0 && replies >= gateAfter && !payoff) {
         if (alreadyAsking) parts.ui = null;
         // Card actions, follow-up bubbles and suggestions would all be dead
         // taps under a compulsory form: the server answers nothing until the
@@ -448,7 +452,7 @@ export class WidgetService {
         parts.next = [];
         followup = autoLeadMessage('gate', knownNow, leadTopic);
         await this.markLead(visitor.id, 'leadGateShown');
-      } else if (softAfter > 0 && replies >= softAfter && !leadState.softShown && !alreadyAsking) {
+      } else if (softAfter > 0 && replies >= softAfter && !leadState.softShown && !alreadyAsking && !payoff) {
         await this.markLead(visitor.id, 'leadSoftShown');
         followup = autoLeadMessage('soft', knownNow, leadTopic);
       }
