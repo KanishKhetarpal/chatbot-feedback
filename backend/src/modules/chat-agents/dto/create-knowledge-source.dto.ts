@@ -1,9 +1,23 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, IsUUID, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+  ValidateIf,
+} from 'class-validator';
 import {
   KNOWLEDGE_DESCRIPTION_MAX_CHARS,
+  KNOWLEDGE_LOAD_MODES,
   KNOWLEDGE_SOURCE_TYPES,
+  KNOWLEDGE_TRIGGER_MAX_CHARS,
+  KNOWLEDGE_TRIGGERS_MAX,
   TEXT_KNOWLEDGE_TYPE,
+  type KnowledgeLoadMode,
 } from '../knowledge.constants';
 
 export class CreateKnowledgeSourceDto {
@@ -38,4 +52,27 @@ export class CreateKnowledgeSourceDto {
   @IsString()
   @MaxLength(KNOWLEDGE_DESCRIPTION_MAX_CHARS)
   description?: string;
+
+  @ApiPropertyOptional({
+    enum: KNOWLEDGE_LOAD_MODES,
+    default: 'always',
+    description:
+      'always: part of the compiled pack sent on every message. on_demand: kept out of the pack and attached to a turn only when one of `triggers` appears in what the visitor wrote.',
+  })
+  @IsOptional()
+  @IsIn([...KNOWLEDGE_LOAD_MODES])
+  loadMode?: KnowledgeLoadMode;
+
+  @ApiPropertyOptional({
+    type: [String],
+    maxItems: KNOWLEDGE_TRIGGERS_MAX,
+    description: 'Words or phrases that pull an on_demand source into a turn. Case-insensitive, matched as whole words.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(KNOWLEDGE_TRIGGERS_MAX)
+  @IsString({ each: true })
+  @MinLength(2, { each: true })
+  @MaxLength(KNOWLEDGE_TRIGGER_MAX_CHARS, { each: true })
+  triggers?: string[];
 }

@@ -5,7 +5,7 @@
  * alumni and recruiters write to it too. When a question needs a person, the bot
  * names the right office with its real contact and offers to pass the message
  * on. Every contact here is copied from the knowledge base
- * (`prisma/sales-bots/knowledge/acharya.md`, section 8 and 7.x); nothing is
+ * (`prisma/sales-bots/knowledge/acharya.md`, section 10); nothing is
  * invented. Offices the knowledge does not list (exam cell, accounts) go to
  * student affairs and the general line, which is what the website does.
  */
@@ -41,7 +41,8 @@ export const DEPARTMENTS: Department[] = [
   {
     key: 'hostel',
     label: 'Hostel office',
-    contact: '+91 99805-98813 · hostelmanager@acharya.ac.in (women\'s 24/7 helpline +91 98808-50112)',
+    contact:
+      '+91 76187-75959 · hostelmanager@acharya.ac.in (general hostel helpline +91 99805-98813; women\'s 24/7 helpline +91 98808-50112)',
     handles: 'rooms, allotment, mess, hostel complaints, hostel fees for current residents',
   },
   {

@@ -40,6 +40,7 @@ import { captureTransport, liveTransport, WhatsappSenderService, type TransportC
 import type { OutboundMessage, OutboundSource, WaOption } from './whatsapp.types';
 import { CrmLeadLookupService } from './crm-lead-lookup.service';
 import { WhatsappScoreService } from './whatsapp-score.service';
+import { onDemandContext } from '../chat-agents/on-demand.util';
 
 const HOUR = 60 * 60 * 1000;
 const MAX_HISTORY = 20;
@@ -726,7 +727,14 @@ export class WhatsappBotService implements OnApplicationBootstrap, OnApplication
       // Coaching is explicit only ("feedback: ...", caught by the router). Letting the model
       // guess which messages were feedback turned ordinary taps into style rules.
       '';
-    const composed = `${known}${context}\n\n---\n\n${followup ? followup.instruction : message}`;
+    // Knowledge kept out of the pack, attached only when their recent words are about it.
+    const reference = await onDemandContext(this.prisma, agent.id, [
+      ...history.filter((m) => m.role === 'user').map((m) => m.content),
+      ...(followup ? [] : [message]),
+    ]);
+    const composed =
+      (reference ? `${reference}\n\n` : '') +
+      `${known}${context}\n\n---\n\n${followup ? followup.instruction : message}`;
 
     const messages: Anthropic.MessageParam[] = [
       ...this.merged(history),

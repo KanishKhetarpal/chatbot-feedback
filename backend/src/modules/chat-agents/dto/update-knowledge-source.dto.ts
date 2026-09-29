@@ -1,6 +1,12 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
-import { KNOWLEDGE_DESCRIPTION_MAX_CHARS } from '../knowledge.constants';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  KNOWLEDGE_DESCRIPTION_MAX_CHARS,
+  KNOWLEDGE_LOAD_MODES,
+  KNOWLEDGE_TRIGGER_MAX_CHARS,
+  KNOWLEDGE_TRIGGERS_MAX,
+  type KnowledgeLoadMode,
+} from '../knowledge.constants';
 
 export class UpdateKnowledgeSourceDto {
   @ApiPropertyOptional({ minLength: 1, maxLength: 200 })
@@ -36,4 +42,18 @@ export class UpdateKnowledgeSourceDto {
   @IsString()
   @MaxLength(KNOWLEDGE_DESCRIPTION_MAX_CHARS)
   description?: string;
+
+  @ApiPropertyOptional({ enum: KNOWLEDGE_LOAD_MODES, description: 'always: in the pack on every message. on_demand: only on turns matching `triggers`.' })
+  @IsOptional()
+  @IsIn([...KNOWLEDGE_LOAD_MODES])
+  loadMode?: KnowledgeLoadMode;
+
+  @ApiPropertyOptional({ type: [String], maxItems: KNOWLEDGE_TRIGGERS_MAX, description: 'Replaces the trigger list.' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(KNOWLEDGE_TRIGGERS_MAX)
+  @IsString({ each: true })
+  @MinLength(2, { each: true })
+  @MaxLength(KNOWLEDGE_TRIGGER_MAX_CHARS, { each: true })
+  triggers?: string[];
 }

@@ -7,6 +7,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { ChatAgentsService } from '../src/modules/chat-agents/chat-agents.service';
 import { KnowledgeService } from '../src/modules/chat-agents/knowledge.service';
 import { TrainingService } from '../src/modules/chat-agents/training.service';
+import { normaliseTriggers } from '../src/modules/chat-agents/on-demand.util';
 import type { CreateChatAgentDto } from '../src/modules/chat-agents/dto/create-chat-agent.dto';
 
 /**
@@ -14,6 +15,10 @@ import type { CreateChatAgentDto } from '../src/modules/chat-agents/dto/create-c
  *
  *   sales-bots/
  *   ├─ knowledge/*.md      shared knowledge base — every bot gets a copy as a text source
+ *   ├─ knowledge/on-demand/*.md
+ *   │                      shared knowledge read only when a turn needs it: a JSON
+ *   │                      header between `---` lines ({"triggers": [...]}) then the
+ *   │                      body. Kept out of the pack; see on-demand.util.ts
  *   └─ bots/*.md           one file per bot: a JSON header between `---` lines (the
  *                          agent settings) followed by the Instructions prompt body
  *
@@ -29,6 +34,15 @@ import type { CreateChatAgentDto } from '../src/modules/chat-agents/dto/create-c
 const ROOT = join(__dirname, 'sales-bots');
 const BOTS_DIR = join(ROOT, 'bots');
 const KNOWLEDGE_DIR = join(ROOT, 'knowledge');
+const ON_DEMAND_DIR = join(KNOWLEDGE_DIR, 'on-demand');
+
+interface KnowledgeDoc {
+  name: string;
+  description: string;
+  content: string;
+  loadMode: 'always' | 'on_demand';
+  triggers: string[];
+}
 
 interface BotFile {
   file: string;
@@ -57,11 +71,11 @@ function parseBotFile(file: string): BotFile {
   return { file, settings, instructions: m[2].trim() };
 }
 
-function loadKnowledge(): Array<{ name: string; description: string; content: string }> {
-  return readdirSync(KNOWLEDGE_DIR)
+function loadKnowledge(): KnowledgeDoc[] {
+  const always = readdirSync(KNOWLEDGE_DIR)
     .filter((f) => f.endsWith('.md'))
     .sort()
-    .map((f) => {
+    .map((f): KnowledgeDoc => {
       const content = readFileSync(join(KNOWLEDGE_DIR, f), 'utf8').replace(/\r\n/g, '\n').trim();
       const title = content.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? f.replace(/\.md$/, '');
       return {
@@ -69,8 +83,34 @@ function loadKnowledge(): Array<{ name: string; description: string; content: st
         description:
           'Official information about Acharya Institutes, Bangalore for admissions enquiries: institutions, programmes, eligibility, admission process, fees policy, scholarships, placements, hostel and campus life, contact details.',
         content,
+        loadMode: 'always',
+        triggers: [],
       };
     });
+
+  const onDemand = existsSync(ON_DEMAND_DIR)
+    ? readdirSync(ON_DEMAND_DIR)
+        .filter((f) => f.endsWith('.md'))
+        .sort()
+        .map((f): KnowledgeDoc => {
+          const raw = readFileSync(join(ON_DEMAND_DIR, f), 'utf8').replace(/\r\n/g, '\n');
+          const m = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+          if (!m) throw new Error(`on-demand/${f}: expected a JSON header between --- lines`);
+          const header = JSON.parse(m[1]) as { triggers?: string[]; description?: string };
+          if (!header.triggers?.length) throw new Error(`on-demand/${f}: header needs "triggers"`);
+          const content = m[2].trim();
+          const title = content.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? f.replace(/\.md$/, '');
+          return {
+            name: title,
+            description: header.description ?? '',
+            content,
+            loadMode: 'on_demand',
+            triggers: header.triggers,
+          };
+        })
+    : [];
+
+  return [...always, ...onDemand];
 }
 
 async function main() {
@@ -114,17 +154,33 @@ async function main() {
     // ── Knowledge ────────────────────────────────────────────────────────────
     const sources = await prisma.chatAgentKnowledgeSource.findMany({
       where: { agentId: agent.id, type: 'text' },
-      select: { id: true, name: true, location: true },
+      select: { id: true, name: true, location: true, loadMode: true, triggers: true },
     });
     for (const doc of knowledgeDocs) {
       const current = sources.find((s) => s.name === doc.name);
-      if (current && current.location.trim() === doc.content) {
+      const same =
+        current &&
+        current.location.trim() === doc.content &&
+        current.loadMode === doc.loadMode &&
+        current.triggers.join('|') === normaliseTriggers(doc.triggers).join('|');
+      if (same) {
         console.log(`  knowledge "${doc.name}" unchanged`);
         continue;
       }
       if (current) await knowledge.delete(current.id);
-      await knowledge.create({ type: 'text', agentId: agent.id, name: doc.name, content: doc.content, description: doc.description });
-      console.log(`  knowledge "${doc.name}" ${current ? 'replaced' : 'added'} (${doc.content.length.toLocaleString()} chars)`);
+      await knowledge.create({
+        type: 'text',
+        agentId: agent.id,
+        name: doc.name,
+        content: doc.content,
+        description: doc.description || undefined,
+        loadMode: doc.loadMode,
+        triggers: doc.triggers,
+      });
+      console.log(
+        `  knowledge "${doc.name}" ${current ? 'replaced' : 'added'} (${doc.content.length.toLocaleString()} chars` +
+          (doc.loadMode === 'on_demand' ? `, on demand: ${doc.triggers.length} triggers)` : ')'),
+      );
     }
 
     // ── Train + activate ─────────────────────────────────────────────────────

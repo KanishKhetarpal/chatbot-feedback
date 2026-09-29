@@ -324,6 +324,13 @@ export type KnowledgeSource = {
   enabled: boolean;
 
   /**
+   * always: compiled into the pack sent (cached) on every message.
+   * on_demand: kept out of the pack; attached only to turns whose words match `triggers`.
+   */
+  loadMode: "always" | "on_demand";
+  triggers: string[];
+
+  /**
    * What this source is, in the author's words. Sent to the model above the
    * content itself — for an uploaded table it is the only thing that says what
    * the columns mean, which is why upload requires it and text does not.

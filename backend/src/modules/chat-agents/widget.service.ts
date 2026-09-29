@@ -15,6 +15,7 @@ import type { AiAttribution } from '../ai/ai-usage.types';
 import { isFrontendOrigin } from '../../common/origins';
 import { resolveEffort } from './chat-agent-models';
 import { buildPersona, buildSystemBlocks, ENGINE_PREAMBLE } from './prompt.util';
+import { onDemandContext } from './on-demand.util';
 import { TrainingService } from './training.service';
 import { DEFAULT_LIMIT_MESSAGE } from './widget-limits.constants';
 import { resolveTheme } from './widget-theme';
@@ -878,7 +879,7 @@ export class WidgetService {
   }
 
   private async runTurn(
-    agent: Parameters<typeof buildSystemBlocks>[0] & { model: string; effort: string; maxTokens: number },
+    agent: Parameters<typeof buildSystemBlocks>[0] & { id: string; model: string; effort: string; maxTokens: number },
     packContent: string,
     history: WidgetChatMessageDto[] | undefined,
     message: string,
@@ -894,7 +895,11 @@ export class WidgetService {
 
     // KNOWN FACTS goes into the LAST user message, never the system prompt —
     // the system prefix is what the prompt cache keys on.
-    const composedMessage = facts ? `${formatKnownFacts(facts)}\n\n---\n\n${message}` : message;
+    const visitorTexts = [...(history ?? []).filter((m) => m.role === 'user').map((m) => m.content), message];
+    // Knowledge kept out of the pack, attached only when this turn is about it.
+    const reference = await onDemandContext(this.prisma, agent.id, visitorTexts);
+    const withFacts = facts ? `${formatKnownFacts(facts)}\n\n---\n\n${message}` : message;
+    const composedMessage = reference ? `${reference}\n\n${withFacts}` : withFacts;
 
     const started = Date.now();
     const result = await this.anthropic.chat(

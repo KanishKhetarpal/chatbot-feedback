@@ -12,6 +12,7 @@ import { AnthropicService } from '../ai/anthropic.service';
 import type { AiAttribution } from '../ai/ai-usage.types';
 import { resolveEffort } from './chat-agent-models';
 import {
+  ALWAYS_LOAD_MODE,
   KNOWLEDGE_CONTEXT_TOKEN_LIMIT,
   KNOWLEDGE_PACK_RETENTION,
 } from './knowledge.constants';
@@ -43,8 +44,11 @@ export interface TrainingState {
   } | null;
 }
 
-/** Enabled and ingested — the sources a build is allowed to compile. */
-const TRAINABLE = { enabled: true, status: 'ready' } as const;
+/**
+ * Enabled, ingested and always-on — the sources a build is allowed to compile.
+ * On-demand sources are read per turn instead (see on-demand.util.ts).
+ */
+const TRAINABLE = { enabled: true, status: 'ready', loadMode: ALWAYS_LOAD_MODE } as const;
 
 /**
  * Compiles an agent's knowledge into the artefact the answer path reads.
