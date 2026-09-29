@@ -1,306 +1,205 @@
 # Acharya Institutes, Bangalore — Admissions Knowledge Base
 
-Compiled September 2026 from acharya.ac.in and its institution sub-sites. Figures are quoted as published. Anything the institution has not published is marked "Not published; counsellor shares on request" — never guess those.
-
-## 1. Overview
-
-- Acharya Institutes is a group of colleges on a single 120-acre campus at Soladevanahalli, Bengaluru, run by the JMJ Education Society. Founded in 1990 by B. Premnath Reddy, Chairman of the group.
-- The group states: over 20,000 students, 1,000 faculty members, 100+ academic programmes across 50 academic streams, 15 research centres, students from 75+ countries, 80 international partnerships.
-- Recognised by the Department of Scientific and Industrial Research (DSIR), Government of India, as a Scientific and Industrial Research Organisation (SIRO).
-- Address: Acharya Dr. S. Radhakrishnan Road, Acharya P.O., Soladevanahalli, Bangalore – 560107, Karnataka, India.
-
-### Institutions in the group
-
-| Institution | Established | Affiliation / approval |
-|---|---|---|
-| Acharya Institute of Technology (AIT) | 2000 | VTU, Belagavi; AICTE approved |
-| Acharya Polytechnic | 1990 | AICTE; DTE Karnataka |
-| Acharya Institute of Graduate Studies (AIGS) | 2005 | Bengaluru City University (BCU) |
-| Acharya & BM Reddy College of Pharmacy (ABMRCP) | Not published | RGUHS; PCI and AICTE approved |
-| Acharya's NRV School of Architecture (ANRVSA) | 2009 | VTU; Council of Architecture approved |
-| Acharya School of Design (ASD) | Not published | Bengaluru City University |
-| Acharya Institute of Allied Health Sciences (AIAHS) | 2019 | RGUHS |
-| Acharya's NR Institute of Physiotherapy (ANRIP) | Not published | RGUHS |
-| Smt. Nagarathnamma College of Nursing | 2003 | RGUHS; INC and KSNC approved |
-| Smt. Nagarathnamma School of Nursing | Not published | Karnataka nursing bodies |
-| Acharya PU College | — | Pre-university |
-| Global MBA | — | Degree awarded by Barcelona Technology School, Spain |
-
-### Accreditations and rankings (published)
-
-- AIT: NAAC accredited and NBA accredited for select programmes; participates in NIRF. The exact NAAC grade and NIRF rank for AIT are not published on the pages checked.
-- AIGS: NAAC A+ (2024).
-- ABMRCP (Pharmacy): NAAC A+ (2024); NBA accredited; NIRF Pharmacy rank 57 (2022).
-- AIT was the first VTU college to offer a Mechatronics undergraduate programme and was one of seven Karnataka colleges funded by the World Bank.
-
-## 2. Programmes offered
-
-### 2.1 Engineering — Acharya Institute of Technology (VTU)
-
-B.E. (4 years) branches: Aeronautical Engineering; Aerospace Engineering; Artificial Intelligence & Machine Learning; Biotechnology; Civil Engineering; Computer Science & Engineering (CSE); CSE (Artificial Intelligence); CSE (Cloud & Full Stack); CSE (Cyber Security); CSE (Data Science); Electrical & Electronics Engineering (EEE); Electronics & Communication Engineering (ECE); Information Science & Engineering (ISE); ISE (Artificial Intelligence); ISE (Cloud & Full Stack); ISE (Cyber Security); Mechanical Engineering; Mechatronics; Robotics & Artificial Intelligence; plus a lateral-entry track for working professionals.
-
-Postgraduate (2 years):
-- MBA (AIT, VTU) — specialisations: Applied Finance, Finance, Human Resource, Marketing.
-- MCA (AIT, VTU) — MCA (General), MCA – Cloud Architect, MCA – Cyber Security. Includes AWS architecting training.
-
-Research: AIT is a recognised VTU Research Centre.
-
-Branch-wise intake (seat) numbers: Not published; counsellor shares on request.
-
-### 2.2 Graduate Studies — AIGS (Bengaluru City University)
-
-Undergraduate (3 years):
-- B.A. — Criminology & Forensic Science, Psychology, Sociology, Journalism, English
-- BBA — General, Aviation, Business Analytics, Digital Marketing, Entrepreneurship, Sports Management
-- BCA — General, Cloud Computing, Data Science, Gen AI
-- B.Com — General, ACCA, CMA
-- B.Sc — General, Computer Science (Data Science), Food Technology
-- BSW — Social Work
-
-Postgraduate (2 years):
-- M.A. — English; Journalism & Mass Communication
-- MBA (AIGS, BCU) — Business Analytics, Entrepreneurship & Startup, Logistics & Supply Chain, Production & Operations Management; single or dual specialisation
-- MCA — AWS Cloud Operations
-- M.Com
-- M.Sc — Physics, Chemistry, Psychology
-- MSW
-
-### 2.3 Pharmacy — Acharya & BM Reddy College of Pharmacy (RGUHS)
-
-- D.Pharm, B.Pharm, Pharm.D, Pharm.D (Post Baccalaureate)
-- M.Pharm — Pharmacology, Pharmaceutics, Pharmaceutical Chemistry, Quality Assurance, Pharmaceutical Analysis, Drug Regulatory Affairs
-- Ph.D. — Pharmaceutical Chemistry, Pharmaceutics, Pharmacology, Pharmaceutical Analysis, Pharmacy Practice
-- Durations follow PCI/RGUHS norms (typically B.Pharm 4 years, Pharm.D 6 years including internship, D.Pharm 2 years, M.Pharm 2 years); counsellor confirms.
-
-### 2.4 Architecture — Acharya's NRV School of Architecture (VTU, COA-approved)
-
-- B.Arch — 5 years, VTU scheme. Curriculum includes "BIM for VDC & Architecture powered by Autodesk".
-- Approved intake reported as 80 seats (third-party source; counsellor confirms).
-- M.Arch is not listed.
-
-### 2.5 Design — Acharya School of Design
-
-- BVA (Bachelor of Visual Arts) — Animation & Game Art; Graphic & Communication Design; Interior & Spatial Design; Product Design. Each offered with an optional European Design Certification and a Global Immersion Track – Europe.
-- B.Sc Fashion and Apparel Design.
-- Duration: not published on the page checked (BVA is typically 4 years); counsellor confirms.
-
-### 2.6 Nursing — Smt. Nagarathnamma College of Nursing (RGUHS; INC & KSNC)
-
-- B.Sc Nursing — 4 years
-- Post Basic B.Sc Nursing — 2 years
-- GNM (General Nursing & Midwifery) — 3 years
-- M.Sc Nursing — 2 years — Medical-Surgical, Mental Health, Community Health, Paediatric Nursing
-- Mandatory clinical training in affiliated hospitals; simulation labs.
-
-### 2.7 Allied Health Sciences — AIAHS (RGUHS; est. 2019)
-
-- B.Sc (3 years) — Anaesthesia & Operation Theatre Technology; Respiratory Care Technology; Renal Dialysis Technology; Optometry; Imaging Technology; Medical Laboratory Technology; Hospital Administration; Occupational Therapy
-- M.Sc (2 years) — Hospital Administration
-- The separate AIHS city campus (Cholanagar) lists BPT, MPT, MHA, B.MLS, B.SMRIT, B.AOTT, B.Sc Nursing and M.Sc Nursing.
-
-### 2.8 Physiotherapy — Acharya's NR Institute of Physiotherapy (RGUHS)
-
-- BPT — 4 years + 6-month compulsory clinical internship (4.5 years total)
-- MPT — 2 years — Sports Sciences, Neurology, Paediatrics, Musculoskeletal Sciences, Cardiovascular & Pulmonary Sciences, Community Health
-
-### 2.9 Polytechnic — Acharya Polytechnic (AICTE; DTE Karnataka; est. 1990)
-
-Diploma (3 years): Aeronautical Engineering; Apparel Design & Fabrication Technology; Architecture Engineering; Civil Engineering; Computer Science & Engineering; Electronics & Communication Engineering; Electrical Engineering & Electric Vehicle Technology; Mechanical Engineering. Offers integrated DCET training for lateral entry into B.E. after the diploma.
-
-### 2.10 Global MBA
-
-- 14-month trimester programme, 124 credits, taught in English, across five institutions: Acharya (India), Federation University (Australia), Asian Institute of Technology (Thailand), Universitas Budi Luhur (Indonesia), Barcelona Technology School (Spain).
-- Degree awarded by Barcelona Technology School, Spain. Intake: November. Three mentors per student (academic, global, industry).
-- Contact: +91 74066-00016, globalmba@acharya.ac.in
-
-### 2.11 Law
-
-No law programme is offered.
-
-## 3. Admission process and eligibility
-
-### 3.1 Three routes (all programmes)
-
-1. Online — apply at the Acharya admissions portal (admissions.acharya.global) or email admissions@acharya.ac.in; a counsellor contacts you, checks eligibility, you upload soft copies of documents, receive an offer, pay fees.
-2. Offline — visit campus, meet counsellors, choose a programme, eligibility verification, complete admission with fee payment.
-3. Entrance-exam route — qualify in the relevant exam (KCET / COMEDK / PGCET / university tests), get merit-based seat allotment through the counselling authority, then complete formalities on campus.
-
-- Registration and counselling are free; submitting the application requires a paid fee (amount not published).
-- Acharya states you can reserve a seat before final board/degree results, subject to meeting eligibility later.
-
-### 3.2 Engineering (B.E.)
-
-- Eligibility: pass in 10+2 / PUC / 'A' Level with English as one language, and minimum 45% aggregate in Physics, Mathematics and one of Chemistry / Biology / Biotechnology / Computer Science / Electronics / Information Science. Minimum age 17.
-- Reserved-category relaxation (40% for Karnataka SC/ST/OBC) follows KEA/VTU norms; counsellor confirms.
-- Entrance exams accepted: KCET, COMEDK UGET, JEE. One of these is required for the entrance route; management-quota seats are filled by direct counselling with Acharya.
-- Seat split by quota (KCET / COMEDK / management): Not published officially; counsellor shares on request.
-- KCET and COMEDK applicants must first register with KEA / COMEDK; management-quota applicants apply on Acharya's portal.
-- Lateral entry: diploma holders enter the second year via DCET.
-
-### 3.3 MBA / MCA
-
-- Eligibility: any Bachelor's degree (3 years) with minimum 50% aggregate including languages. For MCA, Mathematics at 12th or UG level is required.
-- Entrance exams (compulsory): KMAT / PGCET / CMAT / MAT.
-- Extracurricular participation is an added advantage.
-
-### 3.4 BBA / BCA / B.Com / B.A. / B.Sc / BSW (AIGS)
-
-- Pass in PUC / 10+2 / 'A' Level in any discipline from a recognised board. Admission is merit-based; no entrance exam.
-
-### 3.5 Pharmacy (ABMRCP)
-
-- B.Pharm: 10+2 with 45% in Physics, Chemistry and Mathematics/Biology; admission via KCET or merit in 12th (management route).
-- Pharm.D: 10+2 with Physics and Chemistry compulsory (or D.Pharm); age 17 by 31 December of the admission year.
-- Pharm.D (PB): B.Pharm with 50% aggregate. M.Pharm: B.Pharm with 55% aggregate; selection on marks, interview and counselling.
-- NEET is not required for pharmacy admissions.
-
-### 3.6 Architecture (B.Arch)
-
-- 10+2 with English; Physics, Mathematics and one of Chemistry / Biology / Computer Science; minimum 45% aggregate in those three subjects; must have qualified NATA (conducted by the Council of Architecture). JEE Main Paper 2 may be accepted as an alternative; counsellor confirms.
-
-### 3.7 Nursing
-
-- B.Sc Nursing: 10+2 with Physics, Chemistry and Biology (typically 45% in PCB and age 17 by 31 December; INC/RGUHS norms apply).
-- Post Basic B.Sc: GNM diploma and registered nurse status.
-- No NEET requirement is stated.
-
-### 3.8 Allied Health and Physiotherapy
-
-- B.Sc Allied Health: 10+2 with PCB; admission by eligibility verification and counselling; no entrance exam.
-- BPT: 10+2 Science with Physics, Chemistry, Biology and English, 45% aggregate in PCB; NEET / CET not required.
-
-### 3.9 Design
-
-- 10+2 or equivalent; admission may involve counselling, interaction or a portfolio review depending on the programme.
-
-### 3.10 Polytechnic
-
-- Pass in 10th (SSLC) or equivalent; admission via DTE Karnataka counselling or management seats through Acharya's portal.
-
-### 3.11 Documents required
-
-- Domestic: valid Aadhaar card; previous marksheets (10th, 12th, degree as applicable); soft copies for online applicants.
-- For KCET / COMEDK seats, originals plus photocopies are verified at the counselling authority and again on reporting to campus; the full reporting checklist is not published — counsellor shares on request.
-- NRI: academic transcripts, passport, NRI/OCI/PIO status proof, merit certificates.
-- International: academic certificates and transcripts, passport copy, application form, English-proficiency proof (if applicable), Statement of Purpose, merit certificates.
-
-### 3.12 NRI and international admissions
-
-- NRI applicants must hold NRI/OCI/PIO status and have completed Grade 12 (UG) or a Bachelor's degree (PG). Tuition fees are at par with domestic students, payable in Indian rupees. Early applicants get a 100% refundable registration fee and direct provisional-admission eligibility.
-- International students: apply online or on campus → interview with counsellors/principal → document verification → offer letter → pay registration fee → clear first-year fees by early May → apply for student visa → arrive two days before classes. Acharya provides airport pickup (inform two weeks ahead), visa support, hostel allocation, induction, on-campus healthcare and English-language support. Required vaccinations: Yellow Fever, Typhoid, Hepatitis.
-- International office: international@acharya.ac.in, +91 97317-00408 / +91 97317-79233 (WhatsApp call).
-
-## 4. Fees
-
-- Acharya's fee page states that programme fees vary by level of study, course duration and specialisation, and directs students to contact admissions. No programme-wise fee amounts are published on acharya.ac.in.
-- Official position: tuition fees are not published; a counsellor shares the exact fee for the programme and quota on request (admissions hotline +91 74066-44449, admissions@acharya.ac.in).
-- KCET (government-quota) seat fees are fixed by the Government of Karnataka / KEA each year and published in the KEA fee notification, not by Acharya. COMEDK and management-quota fees differ from the KCET fee.
-- Third-party portals list estimated fee ranges; these are not official and must not be quoted as Acharya's fees.
-- Hostel fees and transport fees: not published; counsellor shares on request.
-- Registration and counselling are free; application submission carries a fee (amount not published).
-- **Running offer: Rs 500 off the application fee** when the applicant downloads the Acharya Admissions mobile app and pays the application fee from the app. The discount is applied automatically at checkout in the app; it is not available when paying any other way. The app also gives live application-status alerts, document upload from the phone camera, and chat with their counsellor. Nothing else about the offer (an end date, a limit on numbers, whether it can be combined with anything) is published: a counsellor confirms.
-
-## 5. Scholarships
-
-- Acharya's scholarship programme supports over 1,400 students every year.
-- Domestic scholarship categories: academic excellence; sports (state/national/international); NCC (state/national/international representation); cultural talents; children of farmers; single parents; teachers' children; defence / armed-forces families; BPL card holders; alumni; physically challenged students; siblings of current Acharya students; children of Acharya employees.
-- CET scholarships:
-  - Category 1: 100% tuition-fee waiver for CET meritorious students, based on a rank table published on the scholarship page (exact rank bands: counsellor confirms).
-  - Category 2 (EWS/BPL, CET rank under 5000, Karnataka residents): complete education at zero fee, free hostel and food (multiple-sharing basis), stipend of Rs. 2,500 per month; programme chosen from AIT or Architecture; 10 scholarships; one per family; continued each year if the student maintains at least 75% marks and 85% attendance.
-- International students: merit-based, need-based, country-specific and institutional scholarships; full scholarships are limited and require Management approval. Indicate scholarship interest during the application.
-- Scholarship committee decisions are final. Apply after admission through the college counsellor. Email: scholarship@acharya.ac.in.
-
-## 6. Placements
-
-- Highest package: Rs. 65 LPA (group headline figure on the placements page). Older or branch-specific pages show 45 LPA (CSE) and 26 LPA; quote 65 LPA as the group's highest and say branch-wise figures come from the placement cell.
-- Placement rate: approximately 90% of graduates.
-- 550+ companies visit campus annually (the engineering college page states 200+ corporate recruiters annually).
-- Average package: not published officially; counsellor shares branch-wise data on request.
-- Top recruiters: Microsoft, SAP Labs, Infosys, TCS, Cognizant, Wipro, Amazon, Bosch, Deloitte, Siemens, IBM, Google, L&T; engineering also lists Volvo, Dell, Accenture, Tech Mahindra, EY, KPMG.
-- Allied-health recruiters: Apollo, Prakriya, Narayana, Dr Agarwals.
-- Pharmacy recruiters: Abbott, GSK, Boehringer Ingelheim, Himalaya, Novo Nordisk, Merck, Novartis.
-- Training: technical workshops, soft-skills seminars, mock interviews, resume building; assessment training via Aon CoCubes, AMCAT and eLitmus; certifications with IBM, Google and L&T; a Japan Centre of Excellence (language / culture / business); the "Nini Skillup" nursing programme for overseas healthcare careers (UK, Germany, Australia); internships with partner organisations.
-- 80–100 students serve annually as Placement Volunteer Coordinators.
-- Placement cell email: placements@acharya.ac.in.
-
-## 7. Campus life
-
-### 7.1 Hostels ("Acharya Halls of Residence")
-
-- 12 residences — 5 for boys, 7 for girls — capacity 1,500 residents, on campus.
-- Rooms: single, double and triple occupancy; common areas with TV and newspapers; kitchenettes and laundry in select blocks.
-- Each residence is supervised by a Chief Warden and Deputy Warden (faculty members) with managers and supervisors.
-- Dining: mechanised, hygienic kitchens; vegetarian and non-vegetarian menus set by a monthly Mess Committee (hostel authority, mess manager, student leaders). International students may use the mess or a dedicated kitchen in their hostel.
-- Facilities: high-speed Wi-Fi, laundry, backup power, solar energy, purified water, 24/7 security with CCTV, on-campus medical support, emergency care and ambulance.
-- Helplines: women's 24/7 helpline +91 98808-50112; general hostel helpline +91 99805-98813; email hostelmanager@acharya.ac.in.
-- Acharya also lists recognised PGs as an off-campus option.
-- Hostel fees: not published; counsellor shares on request.
-
-### 7.2 Transport and reaching campus
-
-- Non-AC college buses for students and staff on three routes: Yelahanka side (14 stops, departures 7:10–8:05 am), Yeshwanthpur side (14 stops, 7:00–8:20 am), Nelamangala side (19 stops, 7:10–8:45 am). Routes are extended on request; a bus operates only with minimum 70% occupancy. Book via the transport request form; transport@acharya.ac.in.
-- Distances: Kempegowda International Airport about 35 km; Yeshwantpur Junction 10 km; Cantonment 18 km; KSR Bengaluru City 20 km; nearest metro (Nagasandra / Dasarahalli) about 5 km; BMTC routes 253C / 250J / 250W (Mekhri Circle) and 250Za / 250Y / 250Z (Majestic, Chikbanavara).
-
-### 7.3 Sports
-
-- 10,000-seat multipurpose stadium with floodlights (Smt. Nagarathnamma Stadium), basketball courts, kho-kho court, indoor sports facility, gymnasium, tennis court, volleyball court, multipurpose lawn, swimming pool; horse riding is mentioned on the hostel page.
-- Annual leagues: Acharya Premier League (cricket, 12 teams, 200+ players), 5-a-side Football League, Pro Kabaddi League, Volleyball tournament.
-- Recent achievements: VTU Bangalore North kho-kho winners, VTU State Powerlifting 2nd place, VTU State Taekwondo gold, BCU inter-college handball runners-up, Bangalore Baseball League girls champions.
-
-### 7.4 Clubs and culture
-
-- 50+ student clubs, including NCC, NSS, Acharya Kannada Vedike, Film Forum, Art, Developer's Club, Dance, Literature, Motor Sports (SAE events), Music, Nature Watch (AICTE-recognised), Photography, Theatre, Toastmasters International, iCare (social responsibility).
-- Acharya Habba — the annual techno-cultural fest, reported at 30,000+ students from 300+ colleges. AIT hosted the 25th VTU Youth Festival – Acharya Habba 2026. Other events: Nuditaranga (Karnataka heritage week), Diwali Milan, Dandiya Night, Freshers Week, International Students Day.
-
-### 7.5 Library, labs and other facilities
-
-- Central library: 36,000 sq ft, 200,000+ e-resources, open beyond class hours, with a cafeteria. EDUSAT / e-learning, an IBM Software Centre of Excellence and a Microsoft IT Academy.
-- Labs: computer and electronics labs, a wind tunnel for aeronautical research, clinical skill / simulation labs for health sciences, pharmacy analytical instruments (HPLC, FTIR, Zetasizer).
-- Smart classrooms, central auditorium, conference halls; campus-wide Wi-Fi; Acharya Alive (AI-enabled learning platform) and Acharya ERP.
-- Medical centre: nursing unit, on-call doctors, physiotherapy clinic, ambulances, hospital tie-ups.
-- Multiple cafeterias, ATMs, Campus Mart, post office, vending machines, EV charging; sewage treatment and rainwater harvesting.
-
-## 8. Contact
-
-| Purpose | Contact |
-|---|---|
-| Admissions hotline | +91 74066-44449 |
-| Admissions WhatsApp | +91 97317-97677 |
-| General enquiries | +91 80225-55555 |
-| Admissions email | admissions@acharya.ac.in |
-| International / NRI email | international@acharya.ac.in |
-| International phone / WhatsApp | +91 97317-00408, +91 97317-79233 |
-| Global MBA | +91 74066-00016, globalmba@acharya.ac.in |
-| Scholarships | scholarship@acharya.ac.in |
-| Hostel | hostelmanager@acharya.ac.in |
-| Transport | transport@acharya.ac.in |
-| Placements | placements@acharya.ac.in |
-| Student affairs | info@acharya.ac.in |
-| Alumni | alumni@acharya.ac.in |
-| AIHS city campus (Cholanagar) | 080-2325 8369; info@aihs.ac.in; admissions@aihs.ac.in; 51, AIHS Building, Cholanagar 2nd Cross, Bengaluru 560032 |
-
-- Main campus address: Acharya Dr. S. Radhakrishnan Road, Acharya P.O., Soladevanahalli, Bangalore – 560107, Karnataka, India.
-- Office hours: not published; counsellor shares on request.
-- Online application portal: admissions.acharya.global
-- Ways to talk to admissions, as offered on acharya.ac.in: a counsellor call-back, WhatsApp on +91 97317-97677, a video counselling session (online, with an admissions counsellor), a virtual campus tour on the website, and an in-person campus visit to meet counsellors and see the hostels (the offline admission route). Brochures (domestic, international, PUC) are free to download from the website; a counsellor can also send them on WhatsApp.
-
-## 9. Intake timelines
-
-- Academic year: engineering and other affiliated programmes follow the VTU / BCU / RGUHS academic calendars; exact class-commencement dates are not published — counsellor shares on request.
-- Entrance-based seats follow the counselling authority's schedule (KEA for KCET / PGCET, COMEDK, KMAT). For reference, in 2026 the COMEDK UGET Round 4 choice-filling ran until 28 August 2026, and KMAT 2026 registration was extended to 31 August 2026.
-- NRI merit-based admissions, AY 2026-27: Round 1 applications 1–31 Dec 2025 (merit list 6 Jan 2026); Round 2 8 Jan–5 Feb 2026 (merit list 10 Feb 2026); final round 12 Feb–15 Mar 2026 (merit list 18 Mar 2026).
-- International students: clear first-year fees by early May; arrive two days before classes.
-- Global MBA intake: November.
-- Acharya allows seat reservation before final results, subject to later eligibility. Application deadlines for management-quota seats are not published; enquire with admissions.
-
-## 10. Quick facts
-
-- Founded 1990; 120-acre campus at Soladevanahalli, Bengaluru; 20,000+ students; 100+ programmes; 75+ nationalities.
-- Affiliations: VTU (engineering, architecture, polytechnic), Bengaluru City University (AIGS, design), RGUHS (pharmacy, nursing, allied health, physiotherapy), DTE Karnataka (polytechnic).
-- Accreditation: AIGS NAAC A+ (2024); Pharmacy NAAC A+ (2024), NBA, NIRF Pharmacy 57 (2022); AIT NAAC and NBA accredited.
-- Engineering entry: KCET / COMEDK / JEE or management quota; 45% in the PCM group; age 17+.
-- MBA / MCA entry: 50% in degree + KMAT / PGCET / CMAT / MAT.
-- B.Arch: NATA mandatory. BPT and allied health: no NEET / CET required. Pharmacy: KCET or merit.
-- Placements: highest 65 LPA, about 90% placed, 550+ recruiters.
-- Hostels: 12 residences, 1,500 beds (5 boys', 7 girls'), on campus.
-- Fees, hostel fees, transport fees, branch intakes, office hours: not published; counsellor shares on request.
+Source: acharya.ac.in, all programme pages and official PDFs (brochure, AY 2026 hostel fee sheets, 2026 pre-arrival guides), crawled 28 Sep 2026. Figures are as published. NP = not published: say a counsellor shares it, never estimate. Where Acharya's own pages disagree, both are given; quote the first and say a counsellor confirms.
+
+## 1. Group
+- One 120-acre campus at Soladevanahalli, Bengaluru 560107. Founded 1990 by Founder Chairman B. Premnath Reddy; run by JMJ Education Society. 11 institutions, 12,000+ students (older pages: 20,000+), 1,000+ faculty, 100+ programmes in 50+ streams, 75+ nationalities, 15 research centres, 85+ international partner universities. Campus is ragging-, smoking- and alcohol-free.
+- AIT, Acharya Institute of Technology: engineering, MBA, MCA. VTU, AICTE, est. 2000. NAAC and NBA accredited (grade NP); NBA-accredited: CSE, Mechanical, Biotechnology, ECE, Mechatronics. NIRF band 151–300, Innovation category (2023).
+- AIGS, Acharya Institute of Graduate Studies: Bengaluru City University (BCU), est. 2005, NAAC A+.
+- Acharya & BM Reddy College of Pharmacy: RGUHS, PCI; NAAC A+, NBA; "consistently top 100 in NIRF" (NIRF Pharmacy rank 57 in 2022), "#1 in Karnataka among RGUHS colleges".
+- Smt. Nagarathnamma College of Nursing (est. 2003) and School of Nursing: RGUHS/Govt of Karnataka, INC, KSNC.
+- AIAHS, Acharya Institute of Allied Health Sciences: RGUHS, est. 2019. Acharya's NR Institute of Physiotherapy: RGUHS.
+- Acharya's NRV School of Architecture: VTU, Council of Architecture, est. 2009. Acharya School of Design: Bengaluru City University (per the design/architecture NRI page).
+- Acharya Polytechnic: AICTE, DTE Karnataka, est. 1990. ĀKAR PU College. Global MBA.
+
+## 2. Fees
+- Tuition: NP (polytechnic excepted, section 4). Every programme page says "refer offer letter for actual fee"; it varies by programme, quota and specialisation. KCET and COMEDK seat fees are fixed by the government / KEA / COMEDK, not Acharya. Third-party fee figures are not official.
+- Fee includes tuition, university registration, eligibility, miscellaneous, lab, library and sports fees (plus clinical fee for health programmes). Extra: uniform, stationery, university exam fee.
+- Registration and counselling are free; the application fee amount is NP.
+- Running offer: Rs 500 off the application fee when it is paid from the Acharya Admissions mobile app; applied automatically at checkout in the app, not available any other way. The app also gives application-status alerts, document upload from the phone camera and chat with the counsellor. End date, limits and combining with other offers: NP.
+- Free with admission: laptop (B.E., MCA, B.Arch, BVA, M.Pharm, Ph.D); tablet (AIGS UG, MBA, D.Pharm, B.Pharm, Pharm.D). Most programmes also include outbound training (OBT), soft skills and a LinkedIn Learning licence. B.E., MCA and AIGS UG add AMCAT/CoCubes; B.E., MBA, BBA, BCA, B.Com and B.Sc add a Global Immersion Programme. Allied health, BPT, nursing, diplomas, MA, M.Com, M.Sc and MSW: OBT and soft skills only.
+- Hostel fees, AY 2026, per year, food included (plus attached bath, limited laundry, housekeeping, study table):
+  - Domestic: quadruple Rs 1,00,000 (Cat A) / Rs 90,000 (Cat B); triple Rs 1,40,000 / 1,35,000 / 1,30,000 (Cat A/B/C); twin Rs 2,30,000; single Rs 3,05,000.
+  - International (USD): triple 2,000 / 1,950; twin 2,500; twin with kitchenette 2,500; single 3,900.
+- Mandatory first-year hostel (4-sharing; upgrades cost extra; programme pages say mess not included) for allied-health UG, BPT and B.Sc Nursing. MPT: first-year 4-sharing room free, mess paid separately.
+- Transport fee: NP. Loans: 0% interest loan help for ĀKAR PU; Avanse 0% loan over 12 monthly EMIs for the Global MBA.
+
+## 3. Admission process
+- Online: apply at admissions.acharya.global or email admissions@acharya.ac.in. A counsellor calls, you upload documents, eligibility is checked, then an offer, then fee payment. Offline: visit campus and meet counsellors. Entrance route: KCET / COMEDK / PGCET / university exam; the authority's counselling allots the seat, you pay the authority, then report to campus. Every route includes an interaction with counsellors and the principal. Management-quota seats: apply directly to Acharya.
+- Seat intake per programme and quota split: NP. A seat can be reserved before final board/degree results, subject to meeting eligibility later.
+- To apply: Aadhaar and previous marksheets. At reporting, bring originals plus 3 sets of photocopies:
+  - 10th and 12th marks cards; transfer certificate; conduct certificate
+  - Migration certificate (non-Karnataka and CBSE students)
+  - Aadhaar; income and caste certificates; 15 passport photos
+  - International students also: passport and visa, sponsorship letter or bank statement, travel insurance
+- Cancellation (UGC 2024 rules): written request to the Director of Admissions via admissions@acharya.ac.in or in person. The registration fee is never refunded. Tuition refunds:
+  - 100% if 15+ days before classes start
+  - 80% within 15 days before classes
+  - 90% within 15 days after classes start (table only; the FAQ omits this tier)
+  - 50% between 15 and 30 days after the last date of admission
+  - 0% after 30 days (table: after classes start; FAQ: after the last admission date)
+  - Refunds go to the original payment mode. Missing originals or a missed fee deadline cancels the admission and forfeits the registration fee.
+
+## 4. Programmes and eligibility
+### Engineering, AIT (B.E., 4 yrs, VTU)
+- Eligibility: 10+2 with Physics, Maths and one of Chemistry / Biology / Biotechnology / CS / Electronics, English, 45% aggregate in those; age 17+. Entry: KCET, COMEDK UGET, JEE, or management quota. Diploma holders: 2nd-year lateral entry via DCET.
+- Branches (industry partner):
+  - CSE (NBA; 90%+ placed, highest 45 LPA)
+  - CSE-AI and ISE-AI (IBM)
+  - CSE and ISE Cloud & Full Stack (Oracle)
+  - CSE-Data Science (EC-Council)
+  - CSE-Cyber Security; ISE-Cyber Security (two global cyber certifications)
+  - ISE (up to 98% placed, highest 45 LPA, average 12 LPA)
+  - AI & ML
+  - ECE (NBA; Texas Instruments, Cadence, NVIDIA labs)
+  - EEE (EV specialisation with L&T Technology Services)
+  - Mechanical (NBA; Siemens PLM)
+  - Mechatronics (NBA; Acharya was the first to offer it)
+  - Robotics & AI
+  - Aeronautical (Airbus A320 simulator, wind tunnel)
+  - Aerospace
+  - Civil (L&T EduTech integrated programme)
+  - Biotechnology (NBA)
+- B.E. for working professionals: weekend classes; diploma in any stream plus 1 year of work experience; EEE, Mechanical, ECE only.
+- AIT page: 550+ companies, 90% get offers, highest 65 LPA. It also says IT graduates get "packages ranging from Rs 22–26 LPA" and non-IT 16–18 LPA; quote as worded, it is not stated as an average.
+
+### MBA and MCA (2 yrs)
+- MBA eligibility: any bachelor's with 50% aggregate including languages, plus a MAT / KMAT / PGCET / CMAT score.
+- AIT MBA (VTU): Finance, Marketing, HR or Business Analytics, single or dual (any two), plus Applied Finance (Deloitte certification). Microsoft BI / Gen-AI analytics. "Diamond+ in India's Finest B-School Rankings 2026". Top offers 15.4, 12 and 11 LPA; 92% placed (other pages: 98%).
+- AIGS MBA (BCU): dual, any two of Finance, Business Analytics, Marketing, HR, Entrepreneurship & Start-up, Supply Chain & Logistics. Mandatory full-term corporate internship; MoUs with Infosys, Wipro and Mahindra; EDII Ahmedabad immersion. Top offers 24, 9 and 6.4 LPA; 300+ companies.
+- MCA: AIT (VTU) offers General, Cloud Architect and Cyber Security; AIGS (BCU, AICTE) offers AWS Cloud Operations. The hub page also lists Data Science and Gen AI tracks (institution NP). AWS Architecting training.
+  - Eligibility: bachelor's with 50% and Maths at 12th or UG (AIGS also accepts CS, Statistics, Business Maths or Electronics), plus MAT / KMAT / PGCET (AIT also CMAT).
+- The fee page also lists an MBA FinTech (details NP).
+
+### Graduate studies, AIGS (BCU; UG 3 yrs, PG 2 yrs)
+- UG eligibility: 10+2 in any stream with English, merit-based, no entrance exam. B.Sc needs the Science stream; B.Sc Food Technology needs 45% with Chemistry and Biology.
+- BBA: General; Aviation (IATA/UFTAA foundation course with BIAL); Business Analytics (IBM certification); Digital Marketing (Microsoft certification plus 3 guaranteed Microsoft interviews); Entrepreneurship (90 hrs EDII training plus a 1-month internship at EDII); Sports Management (91 Sporting).
+- BCA (Maths not mandatory): General; Cloud Computing (CloudThat certification); Data Science & AI (IBM); Gen AI (IBM, WatsonX).
+- B.Com: General (CA/CS preparation); ACCA (papers integrated); CMA (US CMA with IMA).
+- B.Sc: Physics / Maths / CS; CS (Data Science) with IBM; Food Technology.
+- B.A, two triple majors: Criminology & Forensic Science + Psychology + Sociology (some pages say English); Psychology + Journalism + English.
+- BSW: 10+2 (one line on its page says graduation + 50%; counsellor confirms).
+- PG eligibility:
+  - M.A English: 40% aggregate + 50% in English, or 55% in the language
+  - M.A Journalism & Mass Communication: graduation + 50%
+  - MSW: graduation with 45% (brochure; page says 50%)
+  - M.Com: B.Com, BBA or BBM with 50% aggregate
+  - M.Sc Physics: 50% Physics, 40% aggregate, Physics and Maths studied
+  - M.Sc Chemistry: 50% Chemistry, 40% aggregate, Maths at PU (not Life Sciences graduates)
+  - M.Sc Psychology: 50% Psychology, 40% aggregate
+
+### Pharmacy (RGUHS; direct admission on eligibility and counselling, no entrance exam, no NEET)
+- D.Pharm: 2 yrs; 10+2 PCB/PCM; leads to 2nd-year B.Pharm lateral entry.
+- B.Pharm: 4 yrs; 10+2 with Physics, Chemistry, Biology or Maths, and English.
+- Pharm.D: 6 yrs including a 1-yr internship; 10+2 PCB/PCM with 45%; age 17 by 31 Dec.
+- Pharm.D Post-Baccalaureate: 3 yrs; B.Pharm with 55%.
+- M.Pharm: 2 yrs; B.Pharm with 55%. Specialisations: Pharmacology, Pharmaceutics, Pharmaceutical Chemistry, Pharmaceutical Analysis, Quality Assurance, Drug Regulatory Affairs.
+- Ph.D: M.Pharm required; minimum 3 yrs full-time or 5 part-time. Areas: Pharmaceutical Analysis, Pharmaceutical Chemistry, Pharmaceutics, Pharmacology, Pharmacy Practice.
+
+### Nursing (no NEET)
+- College: B.Sc Nursing, 4 yrs (10+2 PCB with 50%, age 17+). Post Basic B.Sc, 2 yrs (GNM, registered nurse, 2 years' experience). M.Sc Nursing, 2 yrs (B.Sc Nursing): Medical-Surgical, Obstetrics & Gynaecology, Psychiatric, Paediatric, Community Health.
+  - Pearson certifications; language training for jobs abroad; internships with stipend.
+- School: GNM, 3 yrs; 10+2 (header says any discipline, FAQ says PCB); age 17–35.
+
+### Allied health, AIAHS (RGUHS; 10+2 PCB + English, 50% (FAQs say 45%); no entrance, no NEET)
+- 4 yrs including a 1-yr internship: B.Sc Anaesthesia & OT Technology, Respiratory Care, Renal Dialysis, Imaging, Medical Lab Technology, Optometry (one FAQ says 5 yrs).
+- Bachelor of Occupational Therapy: 4 yrs.
+- Bachelor of Hospital Administration: 3 yrs (FAQ says 4); any stream with 50%.
+- Master of Hospital Administration, 2 yrs. Eligibility: MBBS, BDS, B.Sc Nursing, B.Pharm or an allied-health bachelor's; or an Arts, Commerce, Law, Engineering or Management bachelor's with 50% (SC/ST 45%).
+- Hospital tie-ups; in-house eye clinic.
+- A separate AIHS city campus (Cholanagar) lists BPT, MPT, MHA, B.MLS, B.SMRIT, B.AOTT, B.Sc Nursing and M.Sc Nursing. Contacts in section 10.
+
+### Physiotherapy, ANRIP (RGUHS; no entrance, NEET/CET not required)
+- BPT: 4 yrs + internship (FAQ: 4.5 yrs including a 6-month internship). 10+2 PCB + English, 45% in PCB (header says 50%).
+- MPT: 2 yrs; BPT with 50%. Specialisations: Sports, Neuro, Paediatrics, Musculoskeletal, Cardio-Pulmonary, Community Health.
+- Sports-physio training at Kanteerava Stadium and Padukone-Dravid Centre; on-campus clinic.
+
+### Architecture, ANRVSA
+- B.Arch, 5 yrs, VTU, COA-approved. 10+2 with PCM + English + NATA (as per COA norms). No M.Arch.
+- Autodesk BIM training.
+
+### Design, ASD
+- BVA, 4 yrs: Animation & Game Art; Graphic & Communication Design; Interior & Spatial Design; Product Design. Each comes in three variants:
+  - Core
+  - With European Design Certification from Accademia del Lusso, Milan
+  - Global Immersion Track – Europe: 5–10 day Milan immersion, Italian faculty, Master's pathway to Italy
+- B.Sc Fashion & Apparel Design: 3 yrs.
+- Eligibility: 10+2 in any stream (English as a language) or a 3-yr diploma. May include an aptitude test, portfolio or interview. Immersion cost: NP.
+
+### Polytechnic (3-yr diploma, DTE Karnataka)
+- Eligibility: SSLC with English, Science and Maths, 35% aggregate. Admission via DTE counselling or the Acharya portal. ITI or PUC-II holders can join the 3rd semester (lateral entry).
+- Tuition 2025-26 (mandatory disclosure): Rs 13,405 a year for Karnataka students, Rs 20,755 for others. Intake: Computer Science 120, Electrical & EV 60, others 30.
+- Diplomas: Aeronautical; Apparel Design & Fabrication Technology; Architecture; Civil; Computer Science; ECE; Electrical & EV Technology; Mechanical.
+- DCET coaching for B.E. lateral entry; Japanese training and placement in Japan.
+
+### ĀKAR PU College
+- 2-yr PUC, residential or day scholar: PCMB, PCMCs, CEBA, SEBA, with integrated NEET / JEE / KCET / CA / CLAT coaching.
+- Eligibility: Class 10 pass; migration certificate if from outside Karnataka.
+- Limited 100% merit scholarships per branch; veg-only hostel.
+- Campuses: Soladevanahalli, Whitefield, Bellary, Kolar.
+
+### Global MBA
+- 14 months, November intake, 124 credits, taught in English; degree awarded by Barcelona Technology School, Spain.
+- Route: India (64 credits), then 15 credits each at Federation University (Australia), Asian Institute of Technology (Thailand), Universitas Budi Luhur (Indonesia) and Barcelona.
+- Eligibility: any bachelor's; no entrance stated. Accommodation arranged in each country. Merit scholarships. Fee: NP.
+
+### Not offered
+- Law, M.Arch, MBBS, BAMS, ANM.
+
+## 5. Placements
+- 550+ companies a year; about 90% placed (placements FAQ: about 85%); highest 65 LPA; 4,345+ students placed in 2025. Group average: NP.
+- Recruiters named: Microsoft, SAP Labs, Infosys, TCS, Cognizant, Wipro, Amazon, Bosch, Deloitte, Siemens. Also: Dell, Volvo, Accenture, KPMG, EY, PwC, HDFC Bank.
+- Training: CoCubes / AMCAT / eLitmus assessments, mock interviews, add-on certifications (IBM, Google, L&T, EC-Council, Siemens). Japan Centre of Excellence (Japanese language, jobs in Japan). 80–100 students serve each year as Placement Volunteer Coordinators.
+
+## 6. Scholarships
+- 1,400+ students a year; Rs 15 crore awarded up to 2025. Apply after admission via the counsellor. The committee's decision is final. Only one scholarship per student, except government ones.
+- Categories:
+  - Academic merit
+  - Sports, NCC, cultural (state / national / international level)
+  - Children of farmers, single parents, teachers, defence personnel, Acharya employees
+  - BPL; alumni; physically challenged; siblings of students or alumni
+- CET Category 1: 100% tuition for all years (keep merit scores and 85% attendance). Seats (minimum CET rank): CSE, AI & ML, CS-Data Science, ISE 5 each (1000); ECE 5 (5000); EEE 10 (5000); Mechanical, Civil, Biotechnology, Aeronautical 20 each (5000); Mechatronics 10 (5000); B.Arch 10 (75). Total 135.
+- CET Category 2: Karnataka EWS/BPL students with CET rank under 5000. Zero fees, free hostel and food, Rs 2,500/month stipend, a seat in AIT or Architecture. 10 awards, one per family. Renews with 75% marks and 85% attendance.
+- International: merit, need-based and country-specific; renewable; full awards are limited and need Management approval.
+
+## 7. NRI and international
+- NRI / OCI / PIO: Grade 12 for UG, a bachelor's for PG. Tuition at par with domestic, paid in INR.
+- NRI AY 2026-27 rounds: 1–31 Dec 2025; 8 Jan–5 Feb 2026; final 12 Feb–15 Mar 2026. For rounds 1–2, the registration fee is 100% refundable if withdrawn within 72 hrs of CBSE results.
+- International steps: apply, receive the offer letter, get an Indian student visa and email a scan to the international office. A pre-arrival guide comes 1 month before classes; arrive 2 days before classes.
+- Support: free airport pickup (email flight details at least 1 week before departure); FRRO registration help; on-campus healthcare; English support.
+- Vaccinations: Yellow Fever, Typhoid, Hepatitis.
+
+## 8. Campus life
+- Hostels:
+  - Helplines: women's 24/7 helpline +91 98808-50112; general hostel helpline +91 99805-98813
+  - Separate boys' and girls' hostels on campus; wardens, 24/7 security and CCTV, Wi-Fi, laundry
+  - Veg and non-veg mess, menu set by a student mess committee; kitchenette rooms for international students
+  - 12 residences (5 boys', 7 girls') for up to 1,500, single, double or triple rooms. Recognised PGs as an alternative. Fees in section 2.
+- Transport: non-AC morning buses from Yelahanka (7:10), Magadi Rd / Yeshwanthpur (7:00) and Nelamangala (7:10). A route runs at 70% occupancy; new routes on request.
+- Getting here: airport 35 km; Yeshwantpur Jn 10 km; Nagasandra / Dasarahalli metro about 5 km; BMTC 250Za from Majestic or Chikkabanavara.
+- Facilities:
+  - Library (weekdays 8am–10pm, Sundays 9am–5pm)
+  - 10,000-seat floodlit stadium, pool, gym, courts, horse riding
+  - Physio and eye clinics, ambulances, hospital tie-ups
+  - Cafeterias, ATMs, campus Wi-Fi
+  - ERP with a parent login (attendance, marks, fees)
+- 50+ clubs including NCC, NSS, Toastmasters and Motor Sports. Acharya Habba fest had 50,000+ visitors in 2025, and AIT hosted the 25th VTU Youth Fest in 2026.
+- Success Nexus: 12 foreign languages; IAS academy with a scholarship test worth up to 100%; study-abroad desk (GRE / IELTS / TOEFL).
+
+## 9. AY 2026-27 class start dates
+- All below had already begun as of 28 Sep 2026: Polytechnic 18 Jun; AIGS and Design 15 Jul; AIT B.E. and Architecture 29 Jul; Nursing 3 Aug; Physiotherapy 18 Aug; Pharmacy and Allied Health 16 Sep.
+- MBA/MCA 2026 date: NP (2025 batch began 16 Oct). Global MBA intake: November.
+- Original documents are due 2 days before classes; the first fee is due as per the offer letter. Seats still open: counsellor confirms.
+
+## 10. Contacts
+- Admissions: +91 74066-44449; WhatsApp +91 97317-97677; general +91 80225-55555; admissions@acharya.ac.in; apply at admissions.acharya.global.
+- International / NRI: +91 97317-79233 (WhatsApp), +91 97317-00408; international@acharya.ac.in.
+- Global MBA: +91 74066-00016; globalmba@acharya.ac.in.
+- Hostel: +91 76187-75959; hostelmanager@acharya.ac.in. Women's 24/7 helpline +91 98808-50112; general hostel helpline +91 99805-98813.
+- AIHS city campus (Cholanagar): 080-2325 8369; info@aihs.ac.in; admissions@aihs.ac.in; 51, AIHS Building, Cholanagar 2nd Cross, Bengaluru 560032.
+- Student affairs: info@acharya.ac.in.
+- scholarship@acharya.ac.in · placements@acharya.ac.in · transport@acharya.ac.in · alumni@acharya.ac.in.
+- Student counsellor: +91 81230-84790. Anti-ragging hotline: +91 99457-27317.
+- ĀKAR PU: info@akar.ac.in.
+- Address: Acharya Dr. S. Radhakrishnan Road, Acharya P.O., Soladevanahalli, Bangalore 560107. Office hours: NP.
+- Ways to talk to admissions: counsellor call-back, WhatsApp, free video counselling (acharya.ac.in/vc.html), virtual campus tour, campus visit. Downloadable brochures: domestic, international, PUC, hostel.

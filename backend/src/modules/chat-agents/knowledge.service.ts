@@ -16,9 +16,12 @@ import {
   KNOWLEDGE_PLAN,
   KNOWLEDGE_SOURCE_TYPES,
   LIVE_KNOWLEDGE_TYPES,
+  ALWAYS_LOAD_MODE,
+  ON_DEMAND_LOAD_MODE,
   TEXT_KNOWLEDGE_TYPE,
   type KnowledgeSourceType,
 } from './knowledge.constants';
+import { clearOnDemandCache, normaliseTriggers } from './on-demand.util';
 import { chunkText, formatBytes, sha256 } from './knowledge.util';
 import {
   KnowledgeFileStorageService,
@@ -41,6 +44,8 @@ const LIST_SELECT = {
   status: true,
   error: true,
   enabled: true,
+  loadMode: true,
+  triggers: true,
   description: true,
   fileName: true,
   rowCount: true,
@@ -181,6 +186,14 @@ export class KnowledgeService {
 
     const description = dto.description?.trim() || null;
 
+    const loadMode = dto.loadMode ?? ALWAYS_LOAD_MODE;
+    const triggers = normaliseTriggers(dto.triggers ?? []);
+    if (loadMode === ON_DEMAND_LOAD_MODE && triggers.length === 0) {
+      throw this.badRequest('An on-demand source needs at least one trigger phrase.', 'validation_failed', [
+        { path: 'triggers', message: 'Add at least one trigger phrase' },
+      ]);
+    }
+
     const source = await this.prisma.chatAgentKnowledgeSource.create({
       data: {
         agentId: dto.agentId,
@@ -188,6 +201,8 @@ export class KnowledgeService {
         type: TEXT_KNOWLEDGE_TYPE,
         location: content,
         description,
+        loadMode,
+        triggers,
         status: 'ready',
         chunkCount: chunks.length,
         contentBytes,
@@ -199,6 +214,7 @@ export class KnowledgeService {
       },
     });
 
+    clearOnDemandCache(dto.agentId);
     return this.toDetailApi(source);
   }
 
@@ -207,7 +223,9 @@ export class KnowledgeService {
       dto.name === undefined &&
       dto.enabled === undefined &&
       dto.content === undefined &&
-      dto.description === undefined
+      dto.description === undefined &&
+      dto.loadMode === undefined &&
+      dto.triggers === undefined
     ) {
       throw this.badRequest('No fields to update', 'validation_failed');
     }
@@ -229,12 +247,29 @@ export class KnowledgeService {
     const nextDescription =
       dto.description === undefined ? undefined : dto.description.trim() || null;
 
+    // Moving a source in or out of the pack changes the pack, so it counts as an
+    // edit the training state must notice: on-demand sources are simply not in
+    // the trainable set, which is what flags the agent for a rebuild.
+    const nextLoadMode = dto.loadMode ?? existing.loadMode;
+    const nextTriggers = dto.triggers === undefined ? existing.triggers : normaliseTriggers(dto.triggers);
+    if (nextLoadMode === ON_DEMAND_LOAD_MODE && nextTriggers.length === 0) {
+      throw this.badRequest('An on-demand source needs at least one trigger phrase.', 'validation_failed', [
+        { path: 'triggers', message: 'Add at least one trigger phrase' },
+      ]);
+    }
+    const loadFields = {
+      ...(dto.loadMode !== undefined ? { loadMode: dto.loadMode } : {}),
+      ...(dto.triggers !== undefined ? { triggers: nextTriggers } : {}),
+    };
+    clearOnDemandCache(existing.agentId);
+
     if (dto.content === undefined) {
       const updated = await this.prisma.chatAgentKnowledgeSource.update({
         where: { id },
         data: {
           ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
           ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
+          ...loadFields,
           ...(nextDescription !== undefined
             ? {
                 description: nextDescription,
@@ -267,6 +302,7 @@ export class KnowledgeService {
         data: {
           ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
           ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
+          ...loadFields,
           location: content,
           ...(nextDescription !== undefined ? { description: nextDescription } : {}),
           status: 'ready',
@@ -285,9 +321,10 @@ export class KnowledgeService {
   async delete(id: string) {
     const existing = await this.prisma.chatAgentKnowledgeSource.findUnique({
       where: { id },
-      select: { id: true, storageKey: true },
+      select: { id: true, agentId: true, storageKey: true },
     });
     if (!existing) throw new NotFoundException('Knowledge source not found');
+    clearOnDemandCache(existing.agentId);
 
     // Row first, file second. The row is the record of truth: a deleted row with
     // an orphaned file on disk is untidy, whereas a deleted file with a surviving
@@ -546,6 +583,8 @@ export class KnowledgeService {
       status: source.status,
       error: source.error,
       enabled: source.enabled,
+      loadMode: source.loadMode,
+      triggers: source.triggers,
       description: source.description,
       fileName: source.fileName,
       rowCount: source.rowCount,
@@ -560,7 +599,9 @@ export class KnowledgeService {
       lastSynced: source.lastSynced,
       createdAt: source.createdAt,
       updatedAt: source.updatedAt,
+      // An on-demand source is never compiled into a pack, so it is never "untrained".
       untrained:
+        source.loadMode !== ON_DEMAND_LOAD_MODE &&
         source.status === 'ready' &&
         source.contentHash !== null &&
         source.contentHash !== source.embeddedHash,

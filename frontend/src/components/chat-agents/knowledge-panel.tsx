@@ -437,6 +437,15 @@ function SourceRow({
                 {source.description || "No description — say what the columns mean."}
               </p>
             ) : null}
+            {source.loadMode === "on_demand" ? (
+              <p
+                className="mt-0.5 truncate text-xs text-primary"
+                title={`Not in the pack. Read only when a message mentions: ${source.triggers.join(", ")}`}
+              >
+                On demand · {source.triggers.slice(0, 4).join(", ")}
+                {source.triggers.length > 4 ? ` +${source.triggers.length - 4}` : ""}
+              </p>
+            ) : null}
           </div>
         </div>
       </td>

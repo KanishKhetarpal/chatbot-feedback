@@ -139,6 +139,13 @@ model ChatAgentKnowledgeSource {
 
   enabled Boolean @default(true)
 
+  /// always: compiled into the pack, which rides every call (cached).
+  /// on_demand: kept out of the pack; attached to a single turn, uncached, only
+  /// when one of `triggers` appears in the visitor's recent words. For material
+  /// few conversations need, where paying for it on every call is waste.
+  loadMode String   @default("always")
+  triggers String[] @default([])
+
   contentBytes Int  @default(0)
   fileBytes    Int?
 

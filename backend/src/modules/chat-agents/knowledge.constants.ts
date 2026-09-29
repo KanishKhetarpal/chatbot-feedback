@@ -79,3 +79,21 @@ export const KNOWLEDGE_TABLE_ROWS_PER_CHUNK = 20;
 export const KNOWLEDGE_CELL_MAX_CHARS = 500;
 
 export const KNOWLEDGE_DESCRIPTION_MAX_CHARS = 2_000;
+
+// ── Load mode ────────────────────────────────────────────────────────────────
+
+/**
+ * `always` sources are compiled into the pack, which is sent (cached) on every
+ * call. `on_demand` sources are left out of it and attached to one turn, at the
+ * full uncached input price, when a trigger phrase shows up in what the visitor
+ * just wrote. On-demand is the cheaper choice only for material that a small
+ * share of turns need: a cache read costs about a tenth of fresh input, so the
+ * break-even is roughly one turn in ten.
+ */
+export const KNOWLEDGE_LOAD_MODES = ['always', 'on_demand'] as const;
+export type KnowledgeLoadMode = (typeof KNOWLEDGE_LOAD_MODES)[number];
+export const ALWAYS_LOAD_MODE = 'always' as const;
+export const ON_DEMAND_LOAD_MODE = 'on_demand' as const;
+
+export const KNOWLEDGE_TRIGGERS_MAX = 60;
+export const KNOWLEDGE_TRIGGER_MAX_CHARS = 60;
