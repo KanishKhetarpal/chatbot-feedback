@@ -1,3 +1,8 @@
+# A single-package workspace: this folder only. The file needs a `packages`
+# entry, or pnpm 9 (what Railway's builder runs) refuses to install.
+packages:
+  - '.'
+
 # pnpm 10+ refuses to run dependency build scripts unless they are allowed here.
 allowBuilds:
   '@nestjs/core': true
